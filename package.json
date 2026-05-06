@@ -1,11 +1,12 @@
 {
-  "name": "agda-mode",
-  "displayName": "agda-mode",
-  "description": "",
+  "name": "avea",
+  "displayName": "Avea",
+  "description": "Avea: Another Visual studio code Extension for Agda",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
   },
+  "publisher": "stickypiston",
   "license": "MIT",
   "categories": [
     "Programming Languages"
