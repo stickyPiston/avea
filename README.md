@@ -6,7 +6,7 @@ Avea is a Visual Studio Code extension meant to provide the same development exp
 
 The current version of the extension only supports Agda 2.9.0. You need to have [Agda](https://agda.readthedocs.io/en/latest/getting-started/installation.html) installed on your path, or set a custom path to the Agda binary in the vscode settings for the extension.
 
-The extension itself can be installed via the official Visual Studio Code marketplace, the Open VSX Registry (the vscodium marketplace) and via a manual installation of the VSIX file. VSIX files are built on every commit on the master branch, and can be found under the artifacts section of a workflow run on the [Github Actions page](https://github.com/stickyPiston/agda-mode-vscode/actions).
+The extension itself can be installed via the official [Visual Studio Code marketplace](https://marketplace.visualstudio.com/items?itemName=stickypiston.avea), the [Open VSX Registry](https://open-vsx.org/extension/stickypiston/avea) (the vscodium marketplace) and via a manual installation of the VSIX file. VSIX files are built on every commit on the master branch, and can be found under the artifacts section of a workflow run on the [Github Actions page](https://github.com/stickyPiston/agda-mode-vscode/actions).
 
 > [!WARNING]
 > This extension has some conflicts with other extensions, most notably the Vim extension. Please disable the Vim extension to make sure this extension works without issues.
