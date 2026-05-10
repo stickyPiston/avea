@@ -376,6 +376,8 @@ activate = try λ _ → do
   register-command "agda-mode.backspace" $ uim InputMode.backspace
   register-command "agda-mode.arrow-left" $ uim InputMode.left
   register-command "agda-mode.arrow-right" $ uim InputMode.right
+  register-command "agda-mode.escape" $ uim InputMode.escape
+  register-command "agda-mode.tab" $ uim InputMode.tab
   register-command-with-args "type" λ args →
     required "text" (InputMode.character <$> string) args |> maybe (pure tt) uim
 

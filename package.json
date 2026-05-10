@@ -235,6 +235,16 @@
         "key": "right"
       },
       {
+        "command": "agda-mode.escape",
+        "when": "agda-mode.inInputMode",
+        "key": "escape"
+      },
+      {
+        "command": "agda-mode.tab",
+        "when": "agda-mode.inInputMode",
+        "key": "tab"
+      },
+      {
         "command": "agda-mode.auto-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+a",

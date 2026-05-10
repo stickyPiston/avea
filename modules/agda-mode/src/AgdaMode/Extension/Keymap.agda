@@ -136,7 +136,7 @@ module InputMode where
   Model = Maybe t
 
   data Msg : Set where
-    backspace left right : Msg
+    backspace left right escape tab : Msg
     character : String → Msg
 
   navigate : (Zipper.t → Maybe Zipper.t) → t → Model
@@ -162,6 +162,8 @@ module InputMode where
   update _ (just model) (character c) =
     navigate (Zipper.go-down c) model <$
       execute-command "default:type" (j-object ("text" ↦ j-string c))
+  update _ (just model) escape = pure nothing
+  update _ (just model) tab = nothing <$ execute-command "default:type" (j-object ("text" ↦ j-string "\t"))
 
   update (keymap , e) nothing "\\" = do
     execute-command "default:type" (j-object ("text" ↦ j-string "\\"))
