@@ -70,7 +70,7 @@ init keymap = do
   sbi₂ ← StatusBarItem.create "agdaMode.inputMode" StatusBarItem.left nothing
   let open DecorationType
   dec₁ ← Options.new >>= create ∘ Options.set-text-decoration "underline"
-  dec₂ ← Options.new >>= create ∘ Options.set-background-colour "#fffafa"
+  dec₂ ← Options.new >>= create ∘ Options.set-theme-background-colour "editor.selectionHighlightBackground"
   pure record
     { panel = nothing
     ; status-bar-item = sbi₁

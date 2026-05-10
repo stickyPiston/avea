@@ -32,6 +32,9 @@ module DecorationType where
     postulate set-background-colour : String → t → t
     {-# COMPILE JS set-background-colour = c => t => ({ ...t, backgroundColor: c }) #-}
 
+    postulate set-theme-background-colour : String → t → t
+    {-# COMPILE JS set-theme-background-colour = c => t => ({ ...t, backgroundColor: new AgdaModeImports.vscode.ThemeColor(c) }) #-}
+
     postulate new : IO t
     {-# COMPILE JS new = async () => ({}) #-}
 
