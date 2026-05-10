@@ -30,9 +30,9 @@ module TokenType where
     PrimaryAspect.pragma → keyword
     PrimaryAspect.background → comment
     PrimaryAspect.markup → comment
-    (PrimaryAspect.name _ true) → operator
-    (PrimaryAspect.name nothing false) → variable'
-    (PrimaryAspect.name (just kind) false) → kind |> λ where
+    -- (PrimaryAspect.name _ true) → operator
+    (PrimaryAspect.name nothing _) → variable'
+    (PrimaryAspect.name (just kind) _) → kind |> λ where
       NameKind.bound → parameter ; NameKind.generalisable → variable'
       NameKind.inductive-constructor → enum-member ; NameKind.coinductive-constructor → enum-member
       NameKind.datatype → type ; NameKind.field' → property ; NameKind.function → function
@@ -58,6 +58,13 @@ module Modifier where
   data t : Set where
     default-library : t
   
+  from-PrimaryAspect : PrimaryAspect.t → Maybe t
+  from-PrimaryAspect PrimaryAspect.primitive-type = just default-library
+  from-PrimaryAspect (PrimaryAspect.name (just NameKind.primitive') false) = just default-library
+  from-PrimaryAspect _ = nothing
+
+  show : t → String
+  show default-library = "defaultLibrary"
 
 module HighlightDecoration where
   data t : Set where 

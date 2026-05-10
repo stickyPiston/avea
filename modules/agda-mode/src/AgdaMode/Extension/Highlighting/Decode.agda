@@ -46,7 +46,7 @@ module PrimaryAspect where
     string-decoder = Decode.string >>= λ where
       "comment" → succeed comment ; "keyword" → succeed keyword ; "string" → succeed string
       "number" → succeed number ; "hole" → succeed hole ; "symbol" → succeed symbol
-      "primitivetype" → succeed primitive-type ; "pragma" → succeed pragma 
+      "primitive" → succeed primitive-type ; "pragma" → succeed pragma 
       "background" → succeed background ; "markup" → succeed markup ; _ → ⊘
 
     operator-decoder : Decoder Bool

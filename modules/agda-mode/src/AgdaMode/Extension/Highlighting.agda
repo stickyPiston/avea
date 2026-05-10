@@ -37,7 +37,7 @@ make-highlighting-tokens doc tokens = tokens
   |> map λ (aspect , range) → record
     { range = OffsetRange.to-vsc-range doc range
     ; token-type = TokenType.show (TokenType.from-PrimaryAspect aspect)
-    ; modifiers = []
+    ; modifiers = Maybe-to-List (Modifier.show <$> Modifier.from-PrimaryAspect aspect)
     }
 
 DefaultLegend : Legend.t
