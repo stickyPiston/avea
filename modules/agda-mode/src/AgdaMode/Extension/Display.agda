@@ -356,11 +356,10 @@ show-display-info (goal-specific (GoalInfo.inferred-type type) ip) = type
 show-display-info (goal-specific (GoalInfo.normal-form _ nf) ip) = nf
 show-display-info (goal-specific (GoalInfo.current-goal _ type) ip) =
   "?" ++ Nat.show (ip .id) ++ " : " ++ type
--- show-display-info (goal-info _ info) =
---   let context-info = info .entries |> maybe "" (("\n----- Context ---------------------------\n" ++_) ∘ intercalate "\n" ∘ map show-context-item) in
---   let aux-info = show-aux (info .type-aux) in
---   "Goal: " ++ info .type ++ aux-info ++ context-info
-show-display-info (goal-specific _ _) = ""
+show-display-info (goal-specific (GoalInfo.goal-type entries type aux) ip) =
+  let context-info = entries |> maybe "" (("\n---------- Context ----------\n" ++_) ∘ intercalate "\n" ∘ map show-context-item) in
+  let aux-info = show-aux aux in
+  "Goal: " ++ type ++ aux-info ++ context-info
 show-display-info intro-not-found = "No introduction forms found."
 show-display-info (module-contents (mkModuleContents names contents)) =
   "Modules\n" ++ intercalate "\n" (map ("  " ++_) names) ++
