@@ -247,7 +247,8 @@ data DisplayInfo : Set where
     (invisible-goals : List InvisibleGoal)
     (visible-goals : List Goal)
     (warnings : List String) → DisplayInfo
-  error why-in-scope normal-form inferred-type : String → DisplayInfo
+  error : (error-message : String) → (warnings : List String) → DisplayInfo
+  why-in-scope normal-form inferred-type : String → DisplayInfo
   context : Context → DisplayInfo
   -- goal-info : InteractionPoint.t → GoalInfo → DisplayInfo
   intro-not-found : DisplayInfo
@@ -319,7 +320,7 @@ display-info-decoder = do
         <*> required "invisibleGoals" (list invisible-goal-decoder)
         <*> required "visibleGoals" (list goal-decoder)
         <*> required "warnings" (list error-decoder)
-      "Error" → error <$> required "error" (required "message" string)
+      "Error" → (| error (required "error" (required "message" string)) (required "warnings" (list (required "message" string))) |)
       "Context" → context <$> context-decoder
       "GoalSpecific" → goal-specific
         <$> required "goalInfo" GoalInfo.decoder
@@ -350,7 +351,9 @@ show-display-info (all-goals-warnings errors inv vis warns) =
           ⟨ append ⟩ ("\n---------- Warnings ----------\n" when' not (null? warns))
           ⟨ append ⟩ warns
    in if content == "" then "All good." else content
-show-display-info (error message) = message
+show-display-info (error error-message warnings) =
+  "---------- Error ----------\n" ++ error-message ++
+  "\n\n---------- Warnings ----------\n" ++ intercalate "\n\n" (append warnings warnings)
 show-display-info (context ctx) = show-context ctx
 show-display-info (goal-specific (GoalInfo.inferred-type type) ip) = type
 show-display-info (goal-specific (GoalInfo.normal-form _ nf) ip) = nf
