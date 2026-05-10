@@ -6,6 +6,7 @@ open import Data.Nat
 open import Data.Product
 open import Data.Maybe
 open import Data.Bool
+open import Data.JSON hiding (encode)
 open import Agda.Builtin.Unit
 
 open import Data.IO
@@ -49,7 +50,6 @@ module Position where
     right n t = new (line t) (char t + n)
 
 module Range where
-  open import Data.Bool
   open import Function
 
   postulate t : Set
@@ -123,7 +123,6 @@ module ExtensionContext where
   {-# COMPILE JS extension-path = ctx => ctx.extensionPath #-}
 
 module DocumentSelector where
-  open import Data.JSON hiding (encode)
   open import Data.Map
 
   data t : Set where
@@ -156,8 +155,6 @@ module Location where
   {-# COMPILE JS t.pos = loc => loc.range #-}
 
 module DefinitionProvider where
-  open import Data.Maybe
-
   postulate t : Set
 
   postulate new : (TextDocument.t → Position.t → CancellationToken.t → IO (Maybe Location.t)) → IO t
@@ -168,8 +165,6 @@ module DefinitionProvider where
   } }) #-}
 
   private module Internal where
-    open import Data.JSON
-
     postulate register : JSON → t → IO Disposable.t
     {-# COMPILE JS register = selector => provider => async () => {
       const disposable = AgdaModeImports.vscode.languages.registerDefinitionProvider(selector, provider);
@@ -178,3 +173,41 @@ module DefinitionProvider where
 
   register : DocumentSelector.t → t → IO Disposable.t
   register selector t = Internal.register (DocumentSelector.encode selector) t
+
+module MarkdownString where
+  postulate t : Set
+
+  postulate new : String → t
+  {-# COMPILE JS new = content => new AgdaModeImports.vscode.MarkdownString("```\n" + content + "\n```") #-}
+
+module Hover where
+  record t : Set where
+    constructor mkHover
+    field
+      contents : List MarkdownString.t
+      range : Maybe Range.t
+  open t public
+  {-# COMPILE JS t = ((hover, v) => {
+    const maybe_range = hover.range ? (a => a["just"](hover.range)) : (a => a["nothing"]());
+    return v["mkHover"](hover.contents, maybe_range);
+  }) #-}
+  {-# COMPILE JS mkHover = contents => range =>
+    new AgdaModeImports.vscode.Hover(contents, range({ "just": r => r, "nothing": () => undefined })) #-}
+  {-# COMPILE JS t.contents = hover => hover.contents #-}
+  {-# COMPILE JS t.range = hover => hover.range ? (a => a["just"](hover.range)) : (a => a["nothing"]()) #-}
+open Hover using (contents ; range ; mkHover) public
+
+module HoverProvider where
+  private module Internal where
+    postulate register : JSON → (TextDocument.t → Position.t → CancellationToken.t → IO (Maybe Hover.t)) → IO Disposable.t
+    {-# COMPILE JS register = selector => provider => async () =>
+      AgdaModeImports.vscode.languages.registerHoverProvider(selector, {
+        async provideHover(doc, pos, tok) {
+          const res = await provider(doc)(pos)(tok)();
+          return res({ "just": h => h, "nothing": () => undefined });
+        }
+      })
+    #-}
+  
+  register : DocumentSelector.t → (TextDocument.t → Position.t → CancellationToken.t → IO (Maybe Hover.t)) → IO Disposable.t
+  register selector provider = Internal.register (DocumentSelector.encode selector) provider

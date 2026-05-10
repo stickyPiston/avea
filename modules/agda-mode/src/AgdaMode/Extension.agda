@@ -320,8 +320,6 @@ activate = try λ _ → do
 
   DefinitionProvider.register (language "agda" ∩ scheme "file") =<<
     DefinitionProvider.new λ doc pos tok → agda .response-queue |> JobQueue.await-push (do
-      just e ← TextEditor.active-editor where _ → pure nothing
-      doc ← TextEditor.document e
       model ← IO.Ref.get model-ref
       let offset = TextDocument.offset-at doc pos
       from-Maybe (pure nothing) $ do
@@ -362,6 +360,16 @@ activate = try λ _ → do
           { loaded-files = model .loaded-files [ TextDocument.file-name (e .document) ]:= mkFile new-ips new-tokens }
       nothing → pure tt
     EventEmitter.fire (model .tokens-request-emitter) tt)
+
+  HoverProvider.register (language "agda" ∩ scheme "file") λ doc pos tok → do
+    model ← IO.Ref.get model-ref
+    let offset = TextDocument.offset-at doc pos
+    pure $ do
+      mkFile ips tokens ← model .loaded-files !? TextDocument.file-name doc
+      token ← find (λ tok → OffsetRange.contains? (tok .range) offset) tokens
+      token .note |> λ where
+        "" → nothing
+        note → just (mkHover [ MarkdownString.new note ] (just (OffsetRange.to-vsc-range doc (token .range))))
 
   input-mode-model ← IO.Ref.new $ InputMode.Model ∋ nothing
   let uim x = do IO.Ref.get model-ref >>= λ model → update-input-mode (model .keymap) (model .underline-decoration) (model .input-mode-status-item) input-mode-model x
