@@ -52,6 +52,16 @@ module InteractionPoint where
   equals? : t → t → Bool
   equals? a b = OffsetRange.equals? (a .range) (b .range) ∧ a .id Nat.== b .id
 
+  private
+    ip-range-decoder : Decoder OffsetRange.t
+    ip-range-decoder = do
+      start ← required "start" (required "pos" nat |> fmap (_- 1))
+      end ← required "end" (required "pos" nat |> fmap (_- 1))
+      pure $ offset-range start (end - start)
+
+  decoder : Decoder t
+  decoder = (| mkInteractionPoint (required "id" nat) (list ip-range-decoder |> index 0 |> required "range") |)
+
 open InteractionPoint using (mkInteractionPoint ; id ; range) public
 
 record File : Set where

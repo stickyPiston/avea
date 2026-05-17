@@ -2,7 +2,7 @@
   "name": "avea",
   "displayName": "Avea",
   "description": "Avea: Another Visual studio code Extension for Agda",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.85.0"
   },

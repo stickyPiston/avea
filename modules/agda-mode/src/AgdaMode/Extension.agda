@@ -26,7 +26,7 @@ open import AgdaMode.Extension.Highlighting
 open import AgdaMode.Extension.Highlighting.Decode
 open import AgdaMode.Extension.Highlighting.Legend
 open import AgdaMode.Extension.Keymap
-open import AgdaMode.Extension.Display
+open import AgdaMode.Extension.Response
 open import AgdaMode.Extension.Model
 open import AgdaMode.Extension.Goals
 open import AgdaMode.Extension.Position

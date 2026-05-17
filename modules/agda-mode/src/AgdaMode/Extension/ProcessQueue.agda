@@ -15,7 +15,7 @@ open import Data.Map
 open import Data.JSON.Decode
 
 open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Display
+open import AgdaMode.Extension.Response
 
 open import Vscode.SemanticTokensProvider
 open import Vscode.Common
