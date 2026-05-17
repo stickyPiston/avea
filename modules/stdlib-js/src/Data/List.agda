@@ -7,7 +7,6 @@ open import Function
 open import Data.Maybe
 open import Data.Product
 open import Data.Bool
-open import Data.Monoid
 
 private variable
   a b c : Level

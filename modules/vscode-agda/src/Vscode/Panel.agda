@@ -12,6 +12,7 @@ open import Data.List
 open import Agda.Builtin.Float
 open import Data.JSON hiding (encode)
 open import Data.Map
+open import Class.Monoid
 
 open import Vscode.Common
 

@@ -14,6 +14,8 @@ open import Function hiding (id)
 open import Data.Nat
 open import Data.Int hiding (pos ; _+_)
 import Data.Int as Int
+open import Class.Show
+open import Class.Monoid
 
 import Data.IO as IO
 open IO using (IO)
@@ -28,7 +30,6 @@ open import AgdaMode.Extension.Highlighting.Legend
 open import AgdaMode.Extension.Keymap
 open import AgdaMode.Extension.Response
 open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Goals
 open import AgdaMode.Extension.Position
 open import AgdaMode.Extension.ProcessQueue
 
@@ -107,7 +108,7 @@ show-general-info-cmds = StringMap.empty
 
 backends : StringMap.t Backend.t
 backends = (ghc true ∷ ghc false ∷ js ∷ html ∷ latex ∷ quicklatex ∷ [])
-  |> foldr StringMap.empty λ m b → StringMap.insert (Backend.show b) b m
+  |> foldr StringMap.empty λ m b → StringMap.insert (show b) b m
 
 toggle-cmds : StringMap.t AgdaCommand.t
 toggle-cmds = StringMap.empty
@@ -207,7 +208,7 @@ activate = try λ _ → do
   let keymap-path = Path.join (ExtensionContext.extension-path extension-context ∷ "keymap.json" ∷ [])
   just init-keymap ← load-keymap keymap-path where _ → do
     Window.show-error-message "Failed to read the keymap for the input mode. This is an internal error, please report this." []
-    OutputChannel.error ("Failed to read the keymap at the following path: " String.++ keymap-path) output-chan
+    OutputChannel.error ("Failed to read the keymap at the following path: " <> keymap-path) output-chan
 
   hd-map ← HighlightDecorationMap.init
 
@@ -340,7 +341,7 @@ activate = try λ _ → do
         let changes = e .content-changes
               |> map Change.from-TextDocumentContentChangeEvent
               |> sort-on (λ change → change .range .start)
-              |> foldl ([] , Int.pos 0) (λ (res , Δ) change → (res List.++ [ Change.shift Δ change ]) , (Δ Int.+ (change .by ⊝ change .range .length)))
+              |> foldl ([] , Int.pos 0) (λ (res , Δ) change → (res <> [ Change.shift Δ change ]) , (Δ Int.+ (change .by ⊝ change .range .length)))
               |> Σ.fst in
         let new-tokens = changes |> foldl tokens handle-tokens-change in
 

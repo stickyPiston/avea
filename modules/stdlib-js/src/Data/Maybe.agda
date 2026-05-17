@@ -22,14 +22,3 @@ maybe _ f (just a) = f a
 
 postulate from-just : Maybe A → A
 {-# COMPILE JS from-just = a => A => m => m({ "just": x => x, "nothing": () => { throw new Error("from-just") } }) #-}
-
-open import Data.Monoid
-
-private
-  mappend : ⦃ Semigroup A ⦄ → Maybe A → Maybe A → Maybe A
-  mappend ⦃ s ⦄ (just a) (just b) = just (a <> b) where open Semigroup s
-  mappend _ _ = nothing
-
-instance
-  monoid : ⦃ Semigroup A ⦄ → Monoid (Maybe A)
-  monoid = let s' = record { _<>_ = mappend } in record { semigroup = s' ; empty = nothing }

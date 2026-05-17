@@ -2,7 +2,7 @@ module Vscode.Window where
 
 open import Agda.Builtin.Unit
 open import Agda.Builtin.Nat
-open import Data.String hiding (show)
+open import Data.String
 open import Data.Maybe
 open import Data.Bool
 open import Data.List

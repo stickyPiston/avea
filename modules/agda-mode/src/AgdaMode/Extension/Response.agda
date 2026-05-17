@@ -1,7 +1,7 @@
 module AgdaMode.Extension.Response where
 
-open import Data.String hiding (show)
-open import Data.Nat hiding (show ; _==_) ; import Data.Nat as Nat
+open import Data.String
+open import Data.Nat hiding (_==_) ; import Data.Nat as Nat
 open import Data.Int hiding (pos ; _+_)
 open import Data.IO
 import Data.IO as IO
@@ -11,7 +11,7 @@ open import Data.Maybe
 open import Data.Maybe.Effectful
 open import Data.Map
 open import Data.Bool
-open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ) hiding (show)
+open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ)
 open import Data.JSON
 open import Data.Product
 open import Data.JSON.Decode

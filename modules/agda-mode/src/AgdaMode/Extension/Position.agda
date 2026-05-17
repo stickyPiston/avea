@@ -1,14 +1,16 @@
 module AgdaMode.Extension.Position where
 
-open import Data.Nat hiding (show)
+open import Data.Nat
 import Data.Nat as Nat
 open import Data.Int hiding (_+_)
 open import Data.Bool
 open import Data.Maybe
-open import Data.String hiding (∥_∥ ; show ; _==_)
+open import Data.String hiding (∥_∥ ; _==_)
 import Data.String as String
 open import Data.List hiding (_++_)
 open import Function
+
+open import Class.Show
 
 open import Vscode.TextEditor
 
@@ -32,9 +34,6 @@ module OffsetRange where
   contains? : t → Nat → Bool
   contains? r o = o ∈[ r .start ⋯ r .start + r .length ]
 
-  show : t → String
-  show (offset-range start length) = "offset-range " ++ Nat.show start ++ " " ++ Nat.show length
-
   equals? : t → t → Bool
   equals? (offset-range s₁ l₁) (offset-range s₂ l₂) = s₁ Nat.== s₂ ∧ l₁ Nat.== l₂
 
@@ -48,6 +47,13 @@ module OffsetRange where
 
 open OffsetRange using (offset-range ; start ; length) public
 
+instance
+  Show-OffsetRange : Show OffsetRange.t
+  Show-OffsetRange = record
+    { show = λ where
+      (offset-range start length) → "offset-range " ++ show start ++ " " ++ show length
+    }
+
 module Change where
   record t : Set where
     constructor replace_with-length_
@@ -55,9 +61,6 @@ module Change where
       range : OffsetRange.t
       by : Nat
   open t public
-
-  show : t → String
-  show (replace range with-length by) = "replace " ++ OffsetRange.show range ++ " with-length " ++ Nat.show by
 
   new-range : t → OffsetRange.t
   new-range (replace range with-length by) = offset-range (range .start) by
@@ -81,3 +84,10 @@ module Change where
   from-TextDocumentContentChangeEvent change =
     replace offset-range (change .range-offset) (change .range-length) with-length ∥ split (change .text) "" ∥
 open Change using (replace_with-length_ ; range ; by) public
+
+instance
+  Show-Change : Show Change.t
+  Show-Change = record
+    { show = λ where
+      (replace range with-length by) → "replace " ++ show range ++ " with-length " ++ show by
+    }

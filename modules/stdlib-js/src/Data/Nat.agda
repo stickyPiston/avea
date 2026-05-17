@@ -1,6 +1,6 @@
 module Data.Nat where
 
-open import Agda.Builtin.String using (primShowNat)
+open import Agda.Builtin.String using (primShowNat) public
 open import Agda.Builtin.Nat public
 open import Data.Bool
 open import Data.Product
@@ -37,5 +37,3 @@ a mod b = a - ⌊ a / b ⌋ * b
 
 _quot-rem_ : ℕ → ℕ → ℕ × ℕ
 a quot-rem b = ⌊ a / b ⌋ , a mod b
-
-show = primShowNat

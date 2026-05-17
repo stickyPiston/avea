@@ -4,12 +4,12 @@ open import Agda.Builtin.Unit
 
 open import Data.Maybe
 open import Data.Maybe.Effectful
-open import Data.String hiding (show)
+open import Data.String
 import Data.String as String
 open import Data.Map
 open import Data.List hiding (_++_ ; head)
 open import Data.Product
-open import Data.Nat renaming (show to show-Nat)
+open import Data.Nat
 import Data.Nat as Nat
 open import Data.Bool
 open import Function hiding (id)
@@ -23,7 +23,6 @@ open MonadPlus {{ ... }} using (_<|>_ ; ⊘)
 open import AgdaMode.Extension.Highlighting
 open import AgdaMode.Extension.Highlighting.Decode
 open import AgdaMode.Extension.Keymap
-open import AgdaMode.Extension.Goals
 open import AgdaMode.Extension.Position
 
 open import Vscode.Panel
@@ -33,6 +32,8 @@ open import Vscode.SemanticTokensProvider
 open import Vscode.TextEditor
 
 open import Node.Process
+
+open import Class.Show
 
 module InteractionPoint where
   record t : Set where
@@ -44,10 +45,6 @@ module InteractionPoint where
 
   content-range : t → OffsetRange.t
   content-range (mkInteractionPoint _ range) = offset-range (range .start + 2) (range .length - 4)
-
-  show : t → String
-  show (mkInteractionPoint id range) =
-    "mkInteractionPoint " ++ Nat.show id ++ " " ++ "(" ++ OffsetRange.show range ++ ")"
 
   equals? : t → t → Bool
   equals? a b = OffsetRange.equals? (a .range) (b .range) ∧ a .id Nat.== b .id
@@ -61,8 +58,15 @@ module InteractionPoint where
 
   decoder : Decoder t
   decoder = (| mkInteractionPoint (required "id" nat) (list ip-range-decoder |> index 0 |> required "range") |)
-
 open InteractionPoint using (mkInteractionPoint ; id ; range) public
+
+instance
+  Show-InteractionPoint : Show InteractionPoint.t
+  Show-InteractionPoint = record
+    { show = λ where
+      (mkInteractionPoint id range) →
+        "mkInteractionPoint " ++ show id ++ " " ++ "(" ++ show range ++ ")"
+    }
 
 record File : Set where
   constructor mkFile
@@ -89,12 +93,16 @@ module Rewrite where
   data t : Set where
     as-is instantiated head-normal simplified normalised : t
 
-  show : t → String
-  show as-is = "AsIs"
-  show instantiated = "Instantiated"
-  show head-normal = "HeadNormal"
-  show simplified = "Simplified"
-  show normalised = "Normalised"
+  show' : t → String
+  show' as-is = "AsIs"
+  show' instantiated = "Instantiated"
+  show' head-normal = "HeadNormal"
+  show' simplified = "Simplified"
+  show' normalised = "Normalised"
+
+  instance
+    Show-Rewrite : Show t
+    Show-Rewrite = record { show = show' }
 
   decoder : Decoder t
   decoder = string >>= λ where
@@ -104,19 +112,23 @@ module Rewrite where
     "Simplified" → succeed simplified
     "Normalised" → succeed normalised
     _ → ⊘
-open Rewrite hiding (t ; show ; decoder) public
+open Rewrite hiding (t ; decoder ; show') public
 
 module Backend where
   data t : Set where
     ghc : Bool → t
     js html latex quicklatex : t
 
-  show : t → String
-  show (ghc main?) = if main? then "GHC" else "GHC (no main)" 
-  show js = "JS"
-  show html = "HTML"
-  show latex = "LaTeX"
-  show quicklatex = "QuickLaTeX"
+  show' : t → String
+  show' (ghc main?) = if main? then "GHC" else "GHC (no main)" 
+  show' js = "JS"
+  show' html = "HTML"
+  show' latex = "LaTeX"
+  show' quicklatex = "QuickLaTeX"
+
+  instance
+    Show-Backend : Show t
+    Show-Backend = record { show = show' }
 
   encode : t → String
   encode (ghc main?) = if main? then "GHC" else "GHCNoMain"
@@ -135,12 +147,15 @@ module ComputeMode where
     "UseShowInstance" → succeed use-show-instance
     _ → ⊘
 
-  -- TODO: make case doesn't work here
-  show : t → String
-  show default = "DefaultCompute"
-  show head = "HeadCompute"
-  show ignore-abstract = "IgnoreAbstract"
-  show use-show-instance = "UseShowInstance"
+  show' : t → String
+  show' default = "DefaultCompute"
+  show' head = "HeadCompute"
+  show' ignore-abstract = "IgnoreAbstract"
+  show' use-show-instance = "UseShowInstance"
+
+  instance
+    Show-ComputeMode : Show t
+    Show-ComputeMode = record { show = show' }
 
 module AgdaCommand where
   data t : Set where
@@ -163,7 +178,7 @@ module AgdaCommand where
   show-pos : Nat → TextDocument.t → String
   show-pos offset doc =
     let pos = TextDocument.position-at doc offset
-     in "Pn () " ++ Nat.show (offset + 1) ++ " " ++ Nat.show (Position.line pos) ++ " " ++ Nat.show (Position.char pos)
+     in "Pn () " ++ show (offset + 1) ++ " " ++ show (Position.line pos) ++ " " ++ show (Position.char pos)
 
   show-range : TextDocument.t → OffsetRange.t → String
   show-range doc (offset-range start length) =
@@ -182,10 +197,10 @@ module AgdaCommand where
     --
     -- NOTE: There does seem to be a bug/inconsistency in the compiler when sending the range including markers,
     -- where the locations of errors within the hole are reported incorrectly in the display infos.
-    show-Nat (ip .id) ∷ ("(" ++ show-range doc (ip .range) ++ ")") ∷ ("\"" ++ sanitised-goal-content ++ "\"") ∷ []
+    show (ip .id) ∷ ("(" ++ show-range doc (ip .range) ++ ")") ∷ ("\"" ++ sanitised-goal-content ++ "\"") ∷ []
 
   show-goal-rewrite-command : TextDocument.t → Rewrite.t → InteractionPoint.t → List String
-  show-goal-rewrite-command doc r ip = Rewrite.show r ∷ show-goal-command doc ip
+  show-goal-rewrite-command doc r ip = show r ∷ show-goal-command doc ip
 
   show-list : TextDocument.t → t → List String
   show-list doc load = "Cmd_load" ∷ "\"" ++ TextDocument.file-name doc ++ "\"" ∷ "[]" ∷ []
@@ -203,22 +218,22 @@ module AgdaCommand where
   show-list doc (goal-type-context-check r ip) = "Cmd_goal_type_context_check" ∷ show-goal-rewrite-command doc r ip
   show-list doc (auto-goal r ip) = "Cmd_autoOne" ∷ show-goal-rewrite-command doc r ip
   show-list doc (module-contents-goal r ip) = "Cmd_show_module_contents" ∷ show-goal-rewrite-command doc r ip
-  show-list doc (show-constraints r) = "Cmd_constraints" ∷ Rewrite.show r ∷ []
-  show-list doc (show-metas r) = "Cmd_metas" ∷ Rewrite.show r ∷ []
+  show-list doc (show-constraints r) = "Cmd_constraints" ∷ show r ∷ []
+  show-list doc (show-metas r) = "Cmd_metas" ∷ show r ∷ []
   show-list doc (make-case ip) = "Cmd_make_case" ∷ show-goal-command doc ip
   show-list doc (why-in-scope-goal ip) = "Cmd_why_in_scope" ∷ show-goal-command doc ip
   show-list doc (compile-file backend) = "Cmd_compile" ∷ Backend.encode backend ∷ ("\"" ++ TextDocument.file-name doc ++ "\"") ∷ "[]" ∷ []
-  show-list doc (compute-goal mode ip) = "Cmd_compute" ∷ ComputeMode.show mode ∷ show-goal-command doc ip
-  show-list doc (compute-toplevel mode term) = "Cmd_compute_toplevel" ∷ ComputeMode.show mode ∷ ("\"" ++ term ++ "\"") ∷ []
-  show-list doc (module-contents-toplevel r name) = "Cmd_show_module_contents_toplevel" ∷ Rewrite.show r ∷ ("\"" ++ name ++ "\"") ∷ []
-  show-list doc (infer-toplevel r term) = "Cmd_infer_toplevel" ∷ Rewrite.show r ∷ ("\"" ++ term ++ "\"") ∷ []
-  show-list doc (search-about-toplevel r query) = "Cmd_search_about_toplevel" ∷ Rewrite.show r ∷ ("\"" ++ query ++ "\"") ∷ []
+  show-list doc (compute-goal mode ip) = "Cmd_compute" ∷ show mode ∷ show-goal-command doc ip
+  show-list doc (compute-toplevel mode term) = "Cmd_compute_toplevel" ∷ show mode ∷ ("\"" ++ term ++ "\"") ∷ []
+  show-list doc (module-contents-toplevel r name) = "Cmd_show_module_contents_toplevel" ∷ show r ∷ ("\"" ++ name ++ "\"") ∷ []
+  show-list doc (infer-toplevel r term) = "Cmd_infer_toplevel" ∷ show r ∷ ("\"" ++ term ++ "\"") ∷ []
+  show-list doc (search-about-toplevel r query) = "Cmd_search_about_toplevel" ∷ show r ∷ ("\"" ++ query ++ "\"") ∷ []
   show-list doc (why-in-scope-toplevel term) = "Cmd_why_in_scope_toplevel" ∷ ("\"" ++ term ++ "\"") ∷ []
   show-list doc toggle-hidden = "ToggleImplicitArgs" ∷ []
   show-list doc toggle-irrelevant = "ToggleIrrelevantArgs" ∷ []
 
-  show : TextDocument.t → t → String
-  show = intercalate " " ∘₂ show-list
+  serialise : TextDocument.t → t → String
+  serialise = intercalate " " ∘₂ show-list
 
 module AgdaInteraction where
   record t : Set where
@@ -228,10 +243,14 @@ module AgdaInteraction where
       command : AgdaCommand.t
   open t public
 
-  show : t → String
-  show (iotcm file cmd) =
+  show' : t → String
+  show' (iotcm file cmd) =
     let path = TextDocument.file-name file in
-    "IOTCM \"" ++ path ++ "\" NonInteractive Direct (" ++ AgdaCommand.show file cmd ++ ")\n"
+    "IOTCM \"" ++ path ++ "\" NonInteractive Direct (" ++ AgdaCommand.serialise file cmd ++ ")\n"
+
+  instance
+    Show-AgdaInteraction : Show t
+    Show-AgdaInteraction = record { show = show' }
 
   from-AgdaCommand : AgdaCommand.t → IO (Maybe t)
   from-AgdaCommand cmd = do

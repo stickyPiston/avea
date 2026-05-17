@@ -47,7 +47,3 @@ open Functor ⦃ ... ⦄
 
 _[_]%=_ : ∀ {V} → StringMap.t V → String → (V → V) → StringMap.t V
 o [ k ]%= f = maybe o (o [ k ]:=_) $ f <$> o !? k
-
-infixl 15 _<>_
-_<>_ : ∀ {V} → StringMap.t V → StringMap.t V → StringMap.t V
-_<>_ = StringMap.combine

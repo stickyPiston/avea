@@ -1,7 +1,7 @@
 module AgdaMode.Extension.Response.Display where
 
-open import Data.String hiding (show)
-open import Data.Nat hiding (show ; _==_) ; import Data.Nat as Nat
+open import Data.String
+open import Data.Nat hiding (_==_) ; import Data.Nat as Nat
 open import Data.Int hiding (pos ; _+_)
 open import Data.IO
 import Data.IO as IO
@@ -11,7 +11,7 @@ open import Data.Maybe
 open import Data.Maybe.Effectful
 open import Data.Map
 open import Data.Bool
-open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ) hiding (show)
+open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ)
 open import Data.JSON
 open import Data.Product
 open import Data.JSON.Decode
@@ -36,6 +36,8 @@ open import Effect.Monad
 
 open Monad ⦃ ... ⦄
 open MonadPlus ⦃ ... ⦄ using (⊘ ; _<|>_)
+
+open import Class.Show
 
 private variable
   a : Level
@@ -79,7 +81,7 @@ record Goal : Set where
     type : String
 
 show-goal : Goal → String
-show-goal (mkGoal (mkConstraint name _) type) = "?" ++ Nat.show name ++ " : " ++ type
+show-goal (mkGoal (mkConstraint name _) type) = "?" ++ show name ++ " : " ++ type
 
 goal-decoder : Decoder Goal
 goal-decoder = mkGoal
@@ -300,7 +302,7 @@ show-display-info (context ctx) = show-context ctx
 show-display-info (goal-specific (GoalInfo.inferred-type type) ip) = type
 show-display-info (goal-specific (GoalInfo.normal-form _ nf) ip) = nf
 show-display-info (goal-specific (GoalInfo.current-goal _ type) ip) =
-  "?" ++ Nat.show (ip .id) ++ " : " ++ type
+  "?" ++ show (ip .id) ++ " : " ++ type
 show-display-info (goal-specific (GoalInfo.goal-type entries type aux) ip) =
   let context-info = entries |> maybe "" (("\n---------- Context ----------\n" ++_) ∘ intercalate "\n" ∘ map show-context-item) in
   let aux-info = show-aux aux in

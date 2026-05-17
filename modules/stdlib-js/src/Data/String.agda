@@ -1,7 +1,7 @@
 module Data.String where
 
 open import Agda.Builtin.String
-  using (String ; primShowString ; primStringToList ; primStringFromList)
+  using (String ; primShowString ; primStringToList ; primStringFromList ; primStringAppend)
   renaming
     ( primStringEquality to _==_
     ) public
@@ -48,5 +48,3 @@ postulate trim : String → String
 
 join : List String → String
 join = intercalate ""
-
-show = primShowString

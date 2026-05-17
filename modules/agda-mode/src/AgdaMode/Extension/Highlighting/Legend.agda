@@ -2,7 +2,7 @@ module AgdaMode.Extension.Highlighting.Legend where
 
 open import Data.Maybe
 open import Data.Bool
-open import Data.String hiding (_==_ ; show)
+open import Data.String hiding (_==_)
 open import Data.List
 open import Data.IO
 open import Function

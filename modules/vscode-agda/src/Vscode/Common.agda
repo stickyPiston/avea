@@ -8,6 +8,7 @@ open import Data.Maybe
 open import Data.Bool
 open import Data.JSON hiding (encode)
 open import Agda.Builtin.Unit
+open import Class.Monoid
 
 open import Data.IO
 

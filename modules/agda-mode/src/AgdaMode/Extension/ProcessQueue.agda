@@ -25,6 +25,8 @@ open import Vscode.Command
 
 open import Node.Process
 
+open import Class.Show
+
 module Queue where
   open import Data.List hiding (null?)
   open import Data.List using (null?) public
@@ -82,8 +84,8 @@ module AgdaProcess where
   -- the quality of the messages. This means we don't need to make and use a separate `JobQueue.t`.
   send-command : OutputChannel.t → AgdaInteraction.t → t → IO ⊤
   send-command output-chan intr t = do
-    OutputChannel.trace ("Sending interaction to Agda: " ++ AgdaInteraction.show intr) output-chan
-    Ref.get (t .process) >>= Process.write (AgdaInteraction.show intr) 
+    OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
+    Ref.get (t .process) >>= Process.write (show intr) 
 
   private
     -- Some responses from the interaction mode might start with "JSON> ", so we strip
@@ -103,8 +105,8 @@ module AgdaProcess where
         (just parsed-response) → do
           model ← Ref.get model-ref
           new-model ← handle-agda-message (λ intr → do
-            OutputChannel.trace ("Sending interaction to Agda: " ++ AgdaInteraction.show intr) output-chan
-            Ref.get proc-ref >>= Process.write (AgdaInteraction.show intr)) model-ref model parsed-response or-else pure model
+            OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
+            Ref.get proc-ref >>= Process.write (show intr)) model-ref model parsed-response or-else pure model
           Ref.set model-ref new-model
 
     spawn-proc : OutputChannel.t → IO Process.t
