@@ -2,6 +2,7 @@ module Class.Show where
 
 open import Data.String
 open import Data.Nat
+open import Agda.Builtin.String using (primShowNat)
 open import Data.Int
 open import Data.Bool
 open import Data.List

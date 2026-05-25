@@ -12,24 +12,6 @@ open import Data.IO as IO
 
 open import Vscode.Common
 
-module Event where
-  postulate t : Set → Set
-
-  postulate listen : ∀ {A} → t A → (A → IO ⊤) → IO Disposable.t
-  {-# COMPILE JS listen = _ => event => handler => async () => event(handler) #-}
-
-module EventEmitter where
-    postulate t : Set → Set
-
-    postulate new : ∀ {A} → IO (t A)
-    {-# COMPILE JS new = _ => async () => new AgdaModeImports.vscode.EventEmitter() #-}
-
-    postulate fire : ∀ {A} → t A → A → IO ⊤
-    {-# COMPILE JS fire = _ => emitter => a => async () => { emitter.fire(a) ; return a => a["tt"]() } #-}
-
-    postulate event : ∀ {A} → t A → Event.t A
-    {-# COMPILE JS event = _ => emitter => emitter.event #-}
-
 module SemanticTokens where
     postulate t : Set
 

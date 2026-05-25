@@ -3,6 +3,8 @@ module Data.List where
 open import Agda.Primitive
 open import Agda.Builtin.List public
 open import Data.Nat
+open import Data.Int using (Int)
+open import Class.Ord
 open import Function
 open import Data.Maybe
 open import Data.Product
@@ -20,8 +22,10 @@ pattern [_] a = a ∷ []
 foldr : B → (B → A → B) → List A → B
 foldr b f [] = b
 foldr b f (x ∷ xs) = f (foldr b f xs) x
-
 {-# COMPILE JS foldr = a => A => b => B => b => f => xs => xs.reduceRight((ac, e) => f(ac)(e), b) #-}
+
+last : List A → Maybe A
+last = foldr nothing (λ _ b → just b)
 
 foldl : B → (B → A → B) → List A → B
 foldl b f [] = b
@@ -109,6 +113,14 @@ take-while p (x ∷ xs) = if p x then x ∷ take-while p xs else []
   return i === -1 ? xs : xs.slice(0, i);
 } #-}
 
+postulate span : (A → Bool) → List A → List A × List A
+{-# COMPILE JS span = a => A => p => xs => {
+  const i = xs.findIndex(x => !p(x));
+  return i === -1
+    ? { "_,_": y => y["_,_"](xs, []) }
+    : { "_,_": y => y["_,_"](xs.slice(0, i), x.slice(i)) };
+} #-}
+
 -- TODO: This function is a little dubious, probably needs to be fixed
 postulate sort : List A → List A
 {-# COMPILE JS sort = _ => _ => xs => xs.toSorted() #-}
@@ -116,6 +128,12 @@ postulate sort : List A → List A
 postulate sort-on : (A → B) → List A → List A
 {-# COMPILE JS sort-on = a => A => b => B => f => as =>
   as.toSorted((x, y) => Number(f(x)) - Number(f(y))) #-}
+
+postulate sort-Ord' : (A → A → Int) → List A → List A
+{-# COMPILE JS sort-Ord' = a => A => compare => xs => xs.toSorted((a, b) => Number(compare(a)(b))) #-}
+
+sort-Ord : {{ Ord A }} → List A → List A
+sort-Ord xs = sort-Ord' (Ordering.to-Int ∘₂ compare) xs
 
 snoc : A → List A → List A
 snoc x xs = xs ++ [ x ]
@@ -189,6 +207,14 @@ Maybe-to-List (just x) = [ x ]
 
 map-Maybe : (A → Maybe B) → List A → List B
 map-Maybe f = concat-map λ a → Maybe-to-List (f a)
+
+module NonEmpty where
+  data t (A : Set) : Set where
+    _:|_ : A → List A → t A
+
+  to-List : t A → List A
+  to-List (a :| as) = a ∷ as
+open NonEmpty using (_:|_) public
 
 open import Effect.Applicative
 

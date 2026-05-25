@@ -22,9 +22,8 @@ open import Function hiding (id)
 open import Level
 
 open import AgdaMode.Extension.Highlighting
-open import AgdaMode.Extension.Highlighting.Decode
+open import AgdaMode.Extension.Highlighting.Decode hiding (range-decoder)
 open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Position
 
 open import Vscode.Window
 open import Vscode.Panel
@@ -212,10 +211,11 @@ data DisplayInfo : Set where
 error-decoder : Decoder String
 error-decoder = required "message" string
 
-context-decoder : Decoder Context
-context-decoder = mkContext
-  <$> required "context" (list context-item-decoder)
-  <*> required "interactionPoint" InteractionPoint.decoder
+context-decoder : Decoder (TextDocument.t → Context)
+context-decoder = do
+  items ← required "context" (list context-item-decoder)
+  ip-factory ← required "interactionPoint" InteractionPoint.decoder
+  pure λ doc → mkContext items (ip-factory doc)
 
 data OutputConstraint : Set where
   of-type : (constraint-obj type : String) → OutputConstraint
@@ -254,29 +254,32 @@ output-constraint-decoder = required "kind" string >>= λ where
   "CmpTeles" → cmp-decoder cmp-teles ; "CmpSorts" → cmp-decoder cmp-sorts
   _ → ⊘
 
-display-info-decoder : Decoder DisplayInfo
+display-info-decoder : Decoder (TextDocument.t → DisplayInfo)
 display-info-decoder = do
   "DisplayInfo" ← required "kind" string where _ → ⊘
   required "info" $
     required "kind" string >>= λ where
-      "AllGoalsWarnings" → all-goals-warnings
-        <$> required "errors" (list error-decoder)
-        <*> required "invisibleGoals" (list invisible-goal-decoder)
-        <*> required "visibleGoals" (list goal-decoder)
-        <*> required "warnings" (list error-decoder)
-      "Error" → (| error (required "error" (required "message" string)) (required "warnings" (list (required "message" string))) |)
-      "Context" → context <$> context-decoder
-      "GoalSpecific" → goal-specific
-        <$> required "goalInfo" GoalInfo.decoder
-        <*> required "interactionPoint" InteractionPoint.decoder
-      "IntroNotFound" → succeed intro-not-found
-      "ModuleContents" → (| module-contents ModuleContents.decoder |)
-      "WhyInScope" → (| why-in-scope (required "message" string) |)
+      "AllGoalsWarnings" → const <$> (| all-goals-warnings
+        (required "errors" (list error-decoder))
+        (required "invisibleGoals" (list invisible-goal-decoder))
+        (required "visibleGoals" (list goal-decoder))
+        (required "warnings" (list error-decoder)) |)
+      "Error" → const <$> (| error (required "error" (required "message" string)) (required "warnings" (list (required "message" string))) |)
+      "Context" → do
+        context-factory ← context-decoder
+        pure λ doc → context (context-factory doc)
+      "GoalSpecific" → do
+        goal-info ← required "goalInfo" GoalInfo.decoder
+        ip-factory ← required "interactionPoint" InteractionPoint.decoder
+        pure λ doc → goal-specific goal-info (ip-factory doc)
+      "IntroNotFound" → succeed (const intro-not-found)
+      "ModuleContents" → const <$> (| module-contents ModuleContents.decoder |)
+      "WhyInScope" → const <$> (| why-in-scope (required "message" string) |)
       "SearchAbout" →
         let results-decoder = (| required "name" string , required "term" string |) in
-        (| search-about (required "search" string) (required "results" (list results-decoder)) |)
-      "NormalForm" → (| normal-form (required "expr" string) |)
-      "InferredType" → (| inferred-type (required "expr" string) |)
+        const <$> (| search-about (required "search" string) (required "results" (list results-decoder)) |)
+      "NormalForm" → const <$> (| normal-form (required "expr" string) |)
+      "InferredType" → const <$> (| inferred-type (required "expr" string) |)
       _ → ⊘
 
 _when'_ : A → Bool → List A
@@ -340,8 +343,10 @@ new-panel model-ref = do
     pure tt) panel
   pure panel
 
-handle-display-info : Ref.t Model → Model → DisplayInfo → IO Model
-handle-display-info model-ref model display-info = do
+handle-display-info : Ref.t Model → Model → (TextDocument.t → DisplayInfo) → IO Model
+handle-display-info model-ref model f = TextEditor.active-editor >>= maybe (pure model) λ e → do
+  doc ← TextEditor.document e
+  let display-info = f doc
   panel ← from-Maybe (new-panel model-ref) (pure <$> model .panel)
   Panel.set-html panel ("<pre>" ++ show-display-info display-info ++ "</pre>")
   pure record model { panel = just panel }

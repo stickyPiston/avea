@@ -3,12 +3,16 @@ module Vscode.Common where
 open import Data.List
 open import Data.String
 open import Data.Nat
+open import Data.Int using (Int) ; import Data.Int as Int
 open import Data.Product
 open import Data.Maybe
 open import Data.Bool
+open import Function
 open import Data.JSON hiding (encode)
 open import Agda.Builtin.Unit
 open import Class.Monoid
+open import Class.Show
+open import Class.Ord
 
 open import Data.IO
 
@@ -20,6 +24,24 @@ module Disposable where
 
   postulate dispose : t → IO ⊤
   {-# COMPILE JS dispose = disposable => disposable.dispose() #-}
+
+module Event where
+  postulate t : Set → Set
+
+  postulate listen : ∀ {A} → t A → (A → IO ⊤) → IO Disposable.t
+  {-# COMPILE JS listen = _ => event => handler => async () => event(handler) #-}
+
+module EventEmitter where
+    postulate t : Set → Set
+
+    postulate new : ∀ {A} → IO (t A)
+    {-# COMPILE JS new = _ => async () => new AgdaModeImports.vscode.EventEmitter() #-}
+
+    postulate fire : ∀ {A} → t A → A → IO ⊤
+    {-# COMPILE JS fire = _ => emitter => a => async () => { emitter.fire(a) ; return a => a["tt"]() } #-}
+
+    postulate event : ∀ {A} → t A → Event.t A
+    {-# COMPILE JS event = _ => emitter => emitter.event #-}
 
 module Uri where
   postulate t : Set
@@ -50,6 +72,27 @@ module Position where
     right : Nat → t → t
     right n t = new (line t) (char t + n)
 
+    horizontal-translate : Int → t → t
+    horizontal-translate (Int.negsuc n) = left (suc n)
+    horizontal-translate (Int.pos n) = right n
+
+    postulate equals? : t → t → Bool
+    {-# COMPILE JS equals? = a => b => a.isEqual(b) #-}
+
+    postulate before? : t → t → Bool
+    {-# COMPILE JS before? = a => b => a.isBefore(b) #-}
+
+    instance
+      Show-Position : Show t
+      Show-Position = record { show = λ p → show (line p) <> ":" <> show (char p) }
+
+      Ord-Position : Ord t
+      Ord-Position = record
+        { compare =
+          let transformed pos = line pos , char pos in
+          compare on transformed
+        }
+
 module Range where
   open import Function
 
@@ -63,14 +106,34 @@ module Range where
   {-# COMPILE JS start = range => range.start #-}
   {-# COMPILE JS end = range => range.end #-}
 
-  postulate _in-range_ : Position.t → t → 𝔹
-  {-# COMPILE JS _in-range_ = pos => range => range.contains(pos) #-}
+  postulate contains? : Position.t → t → Bool
+  {-# COMPILE JS contains? = pos => range => range.contains(pos) #-}
 
   postulate _∩_ : t → t → Maybe t
   {-# COMPILE JS _∩_ = a => b => {
     const i = a.intersection(b);
     return i ? (x => x["just"](i)) : (x => x["nothing"]());
   } #-}
+
+  postulate _∪_ : t → t → t
+  {-# COMPILE JS _∪_ = a => b => a.union(b) #-}
+
+  postulate equals? : t → t → Bool
+  {-# COMPILE JS equals? = a => b => a.isEqual(b) #-}
+
+  postulate empty? : t → Bool
+  {-# COMPILE JS empty? = r => r.isEmpty #-}
+
+  left right : Nat → t → t
+  left n r = new (Position.left n $ start r) (Position.left n $ end r)
+  right n r = new (Position.right n $ start r) (Position.right n $ end r)
+
+  length : t → Nat
+  length r = Position.char (end r) - Position.char (start r)
+
+  instance
+    Show-Range : Show t
+    Show-Range = record { show = λ r → "[" <> show (start r) <> "-" <> show (end r) <> ")" }
 
 module TextLine where
     postulate t : Set

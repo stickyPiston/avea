@@ -21,9 +21,8 @@ open Monad {{ ... }}
 open MonadPlus {{ ... }} using (_<|>_ ; ⊘)
 
 open import AgdaMode.Extension.Highlighting
-open import AgdaMode.Extension.Highlighting.Decode
+open import AgdaMode.Extension.Highlighting.Decode hiding (range-decoder)
 open import AgdaMode.Extension.Keymap
-open import AgdaMode.Extension.Position
 
 open import Vscode.Panel
 open import Vscode.Window
@@ -40,24 +39,44 @@ module InteractionPoint where
     constructor mkInteractionPoint
     field
       id : Nat
-      range : OffsetRange.t
+      range : Range.t
   open t public
 
-  content-range : t → OffsetRange.t
-  content-range (mkInteractionPoint _ range) = offset-range (range .start + 2) (range .length - 4)
+  content-range : t → Range.t
+  content-range (mkInteractionPoint _ range) = -- offset-range (range .start + 2) (range .length - 4)
+    Range.new (Position.right 2 $ Range.start range) (Position.left 2 $ Range.end range)
 
   equals? : t → t → Bool
-  equals? a b = OffsetRange.equals? (a .range) (b .range) ∧ a .id Nat.== b .id
+  equals? a b = Range.equals? (a .range) (b .range) ∧ a .id Nat.== b .id
 
-  private
-    ip-range-decoder : Decoder OffsetRange.t
-    ip-range-decoder = do
-      start ← required "start" (required "pos" nat |> fmap (_- 1))
-      end ← required "end" (required "pos" nat |> fmap (_- 1))
-      pure $ offset-range start (end - start)
+  start-marker end-marker : t → Range.t
+  start-marker ip =
+    let ip-start = Range.start $ ip .range in
+    Range.new ip-start (Position.right 2 $ ip-start)
+  end-marker ip =
+    let ip-end = Range.end $ ip .range in
+    Range.new (Position.left 2 $ ip-end) ip-end
 
-  decoder : Decoder t
-  decoder = (| mkInteractionPoint (required "id" nat) (list ip-range-decoder |> index 0 |> required "range") |)
+  cursor-position : t → Position.t
+  cursor-position = Position.right 3 ∘ Range.start ∘ range
+
+  pos-decoder : Decoder Position.t
+  pos-decoder = do
+    line ← required "line" nat
+    col ← required "col" nat
+    pure $ Position.new (line - 1) (col - 1)
+
+  range-decoder : Decoder Range.t
+  range-decoder = do
+    start ← required "start" pos-decoder
+    end ← required "end" pos-decoder
+    pure $ Range.new start end
+
+  decoder : Decoder (TextDocument.t → t)
+  decoder = do
+    id ← required "id" nat
+    range ← list range-decoder |> index 0 |> required "range"
+    pure λ doc → mkInteractionPoint id range
 open InteractionPoint using (mkInteractionPoint ; id ; range) public
 
 instance
@@ -65,7 +84,7 @@ instance
   Show-InteractionPoint = record
     { show = λ where
       (mkInteractionPoint id range) →
-        "mkInteractionPoint " ++ show id ++ " " ++ "(" ++ show range ++ ")"
+        "mkInteractionPoint " ++ show id ++ " " ++ show range
     }
 
 record File : Set where
@@ -175,19 +194,21 @@ module AgdaCommand where
     why-in-scope-toplevel : String → t
     toggle-hidden toggle-irrelevant : t
 
-  show-pos : Nat → TextDocument.t → String
-  show-pos offset doc =
-    let pos = TextDocument.position-at doc offset
+  show-pos : Position.t → TextDocument.t → String
+  show-pos pos doc =
+    let offset = TextDocument.offset-at doc pos
      in "Pn () " ++ show (offset + 1) ++ " " ++ show (Position.line pos) ++ " " ++ show (Position.char pos)
 
-  show-range : TextDocument.t → OffsetRange.t → String
-  show-range doc (offset-range start length) =
-    let range = "Interval () (" ++ show-pos start doc ++ ") (" ++ show-pos (start + length) doc ++ ")"
+  show-range : TextDocument.t → Range.t → String
+  show-range doc range =
+    let start = Range.start range in
+    let end = Range.end range in
+    let range = "Interval () (" ++ show-pos start doc ++ ") (" ++ show-pos end doc ++ ")"
      in "intervalsToRange Nothing [" ++ range ++ "]"
 
   show-goal-command : TextDocument.t → InteractionPoint.t → List String
   show-goal-command doc ip = 
-    let goal-content = doc |> TextDocument.get-text (OffsetRange.to-vsc-range doc $ InteractionPoint.content-range ip) in
+    let goal-content = doc |> TextDocument.get-text (InteractionPoint.content-range ip) in
     let sanitised-goal-content = replace "\"" "\\\"" goal-content in
 
     -- We send along an up-to-date version of the interaction point's range.
@@ -262,9 +283,9 @@ module AgdaInteraction where
   under-cursor-command model cmd = do
     just e ← TextEditor.active-editor where _ → pure nothing
     doc ← TextEditor.document e
-    cursor ← TextDocument.offset-at doc <$> TextEditor.cursor-pos e
+    cursor ← TextEditor.cursor-pos e
     model .loaded-files !? TextDocument.file-name doc |> maybe (pure nothing) λ (record { interaction-points = ips }) → do
-     ips |> find (λ ip → OffsetRange.contains? (ip .range) cursor) |> maybe (pure nothing) λ ip → do
+     ips |> find (λ ip → Range.contains? cursor (ip .range)) |> maybe (pure nothing) λ ip → do
       pure $ just (iotcm doc (cmd ip))
 
   input-prompt-command : (String → AgdaCommand.t) → IO (Maybe t)

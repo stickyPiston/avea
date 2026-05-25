@@ -21,8 +21,8 @@ _∘_ : (B → C) → (A → B) → A → C
 _∘₂_ : (C → D) → (A → B → C) → A → B → D
 (f ∘₂ g) a b = f (g a b)
 
-_on_ : (A → B) → (B → B → C) → A → A → C
-f on g = λ l r → g (f l) (f r)
+_on_ : (B → B → C) → (A → B) → A → A → C
+f on g = λ l r → f (g l) (g r)
 
 infixl 1 _|>_
 

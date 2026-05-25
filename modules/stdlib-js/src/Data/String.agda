@@ -16,7 +16,7 @@ _++_ = primStringAppend
 open import Data.List using (List)
 open import Agda.Builtin.Nat
 
-postulate _starts-with_ : String → String → 𝔹
+postulate _starts-with_ : String → String → Bool
 {-# COMPILE JS _starts-with_ = s => pre => s.startsWith(pre) #-}
 
 postulate slice : Nat → Nat → String → String
@@ -34,7 +34,7 @@ postulate unlines : List String → String
 postulate intercalate : String → List String → String
 {-# COMPILE JS intercalate = x => xs => xs.join(x) #-}
 
-postulate _=~_ : String → String → 𝔹
+postulate _=~_ : String → String → Bool
 {-# COMPILE JS _=~_ = s => r => new RegExp(r).test(s) #-}
 
 postulate replace : String → String → String → String

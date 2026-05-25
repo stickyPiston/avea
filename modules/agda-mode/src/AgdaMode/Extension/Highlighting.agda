@@ -19,7 +19,6 @@ open import Vscode.TextEditor
 
 open import AgdaMode.Extension.Highlighting.Decode
 open import AgdaMode.Extension.Highlighting.Legend
-open import AgdaMode.Extension.Position
 
 apply-decorations : HighlightDecorationMap.t → TextEditor.t → List Token.t → IO ⊤
 apply-decorations hd-map e tokens = do
@@ -27,15 +26,14 @@ apply-decorations hd-map e tokens = do
   doc ← TextEditor.document e
   forM HighlightDecoration.enum λ dec → do
     let ranges = modifiers |> map-Maybe λ (dec' , pos) → if dec' HighlightDecoration.== dec then just pos else nothing
-    let vsc-ranges = ranges |> map (OffsetRange.to-vsc-range doc)
-    TextEditor.set-decoration (hd-map dec) vsc-ranges e
+    TextEditor.set-decoration (hd-map dec) ranges e
   pure tt
 
 make-highlighting-tokens : TextDocument.t → List Token.t → List SemanticToken.t
 make-highlighting-tokens doc tokens = tokens
   |> map-Maybe (λ token → (_, token .range) <$> token .primary)
   |> map λ (aspect , range) → record
-    { range = OffsetRange.to-vsc-range doc range
+    { range = range
     ; token-type = TokenType.show (TokenType.from-PrimaryAspect aspect)
     ; modifiers = Maybe-to-List (Modifier.show <$> Modifier.from-PrimaryAspect aspect)
     }

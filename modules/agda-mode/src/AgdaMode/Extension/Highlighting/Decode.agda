@@ -4,7 +4,7 @@ open import Data.Maybe
 open import Data.Bool
 open import Data.List
 import Data.List as List
-open import Data.Nat
+open import Data.Nat ; import Data.Nat as Nat
 open import Data.Product
 open import Data.String
 import Data.String as String
@@ -14,11 +14,55 @@ open import Data.JSON
 open import Data.JSON.Decode hiding (string)
 import Data.JSON.Decode as Decode
 open import Function
+open import Data.Int hiding (_+_)
+open import Class.Show
+open import Class.Monoid
+open import Class.Ord
+
+open import Vscode.Common
 
 open import Effect.Monad
 open MonadPlus {{ ... }}
 
-open import AgdaMode.Extension.Position
+_∈[_⋯_] : Nat → Nat → Nat → Bool
+n ∈[ lo ⋯ hi ] = lo ≤ n ∧ n ≤ hi
+
+module OffsetRange where
+  record t : Set where
+    constructor offset-range
+    field
+      start length : Nat
+  open t public
+
+  end : t → Nat
+  end r = r .start + r .length - 1
+
+  shift : Int → t → t
+  shift (pos n) r = record r { start = r .start + n }
+  shift (negsuc n) r = record r { start = r .start - suc n }
+
+  contains? : t → Nat → Bool
+  contains? r o = o ∈[ r .start ⋯ r .start + r .length ]
+
+  equals? : t → t → Bool
+  equals? (offset-range s₁ l₁) (offset-range s₂ l₂) = s₁ Nat.== s₂ ∧ l₁ Nat.== l₂
+
+  open import Vscode.Common
+
+  to-vsc-range : TextDocument.t → t → Range.t
+  to-vsc-range doc (offset-range start length) =
+    let start-pos = TextDocument.position-at doc start in
+    let end-pos = TextDocument.position-at doc (start + length) in
+    Range.new start-pos end-pos
+
+open OffsetRange using (offset-range ; start ; length) public
+
+instance
+  Show-OffsetRange : Show OffsetRange.t
+  Show-OffsetRange = record
+    { show = λ where
+      (offset-range start length) → "offset-range " <> show start <> " " <> show length
+    }
 
 module NameKind where
   data t : Set where
@@ -91,6 +135,15 @@ module DefinitionSite where
   decoder = (| mk-DefinitionSite (required "filepath" Decode.string) (required "position" nat) |)
 open DefinitionSite using (filepath ; position) public
 
+range-decoder : Decoder (TextDocument.t → Range.t)
+range-decoder = do
+  start ← list nat |> index 0 |> fmap (_- 1)
+  end ← list nat |> index 1 |> fmap (_- 1)
+  pure λ doc →
+    let start-pos = TextDocument.position-at doc start in
+    let end-pos = TextDocument.position-at doc end in
+    Range.new start-pos end-pos
+
 module Token where
   record t : Set where
     constructor mk-Token
@@ -100,27 +153,23 @@ module Token where
       note : String
       definition-site : Maybe DefinitionSite.t
       token-based : Bool
-      range : OffsetRange.t
+      range : Range.t
   open t public
 
-  private
-    range-decoder : Decoder OffsetRange.t
-    range-decoder = do
-      start ← list nat |> index 0 |> fmap (_- 1)
-      end ← list nat |> index 1 |> fmap (_- 1)
-      pure $ offset-range start (end - start)
-
-  decoder : Decoder t
-  decoder = (| mk-Token
-    (required "atoms" PrimaryAspect.decoder)
-    (required "atoms" SecondaryAspect.decoder)
-    (required "note" Decode.string)
-    (optional-null "definitionSite" DefinitionSite.decoder)
-    (required "tokenBased" Decode.string <&> ("TokenBased" String.==_))
-    (required "range" range-decoder) |)
+  decoder : Decoder (TextDocument.t → t)
+  decoder = do
+    pas ← required "atoms" PrimaryAspect.decoder
+    sas ← required "atoms" SecondaryAspect.decoder
+    note ← required "note" Decode.string
+    ds ← optional-null "definitionSite" DefinitionSite.decoder
+    tb? ← required "tokenBased" Decode.string <&> ("TokenBased" String.==_)
+    range-factory ← required "range" range-decoder
+    pure $ λ doc → mk-Token pas sas note ds tb? (range-factory doc)
 open Token using (primary ; secondary ; note ; definition-site ; token-based ; range) public
 
-highlighting-info-decoder : Decoder (List Token.t × Bool)
+highlighting-info-decoder : Decoder (TextDocument.t → List Token.t × Bool)
 highlighting-info-decoder = required "kind" Decode.string >>= λ where
-  "HighlightingInfo" → required "info" (| required "payload" (list Token.decoder) , required "remove" bool |)
+  "HighlightingInfo" → do
+    tokens-factory , remove? ← required "info" (| required "payload" (list Token.decoder) , required "remove" bool |)
+    pure λ doc → map (_$ doc) tokens-factory , remove?
   _ → ⊘

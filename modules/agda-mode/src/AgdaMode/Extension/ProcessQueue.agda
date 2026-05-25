@@ -26,6 +26,7 @@ open import Vscode.Command
 open import Node.Process
 
 open import Class.Show
+open import Class.Ord
 
 module Queue where
   open import Data.List hiding (null?)

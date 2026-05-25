@@ -24,7 +24,6 @@ open import Level
 open import AgdaMode.Extension.Highlighting
 open import AgdaMode.Extension.Highlighting.Decode
 open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Position
 open import AgdaMode.Extension.Response.Display
 open import AgdaMode.Extension.Response.Goal
 
@@ -51,10 +50,11 @@ parse-response response = do
   let truncated-response = if (response starts-with "JSON> ") then sliceˢ 6 ∥ response ∥ˢ response else response
   parse-json truncated-response
 
-handle-highlighting-info : Model → List Token.t × Bool → IO Model
-handle-highlighting-info model (token-list , remove) = do
+handle-highlighting-info : Model → (TextDocument.t → List Token.t × Bool) → IO Model
+handle-highlighting-info model f = do
   just e ← TextEditor.active-editor where _ → pure model
   doc ← TextEditor.document e
+  let token-list , remove = f doc
 
   m ← model .loaded-files !? TextDocument.file-name doc |> λ where
     nothing → pure record model
@@ -163,6 +163,10 @@ handle-jump-to-error model jump-to-error = do
     }
   pure model
 
+private
+  postulate trace : {A : Set} → A → IO ⊤
+  {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
+
 -- TODO: Change this to have type Decoder (Model → IO Model)
 handle-agda-message : (AgdaInteraction.t → IO ⊤) → Ref.t Model → Model → Decoder (IO Model)
 handle-agda-message send-command model-ref model =
@@ -176,4 +180,5 @@ handle-agda-message send-command model-ref model =
    | (handle-interaction-points model) interaction-points-decoder
    | (handle-give-action send-command model) give-action-decoder
    | (handle-make-case send-command model) make-case-decoder
+   | (λ x → trace x >> pure model) any
    |)

@@ -16,6 +16,7 @@ open import Data.Int hiding (pos ; _+_)
 import Data.Int as Int
 open import Class.Show
 open import Class.Monoid
+open import Class.Ord
 
 import Data.IO as IO
 open IO using (IO)
@@ -124,29 +125,6 @@ postulate get-compute-mode-string : GiveArgsObject → String
 postulate get-rewrite-string : GiveArgsObject → String
 {-# COMPILE JS get-rewrite-string = o => o?.rewrite ?? "" #-}
 
-set-token-range : Token.t → OffsetRange.t → Token.t
-set-token-range t r = record t { range = r }
-
-handle-offset-change : Change.t → OffsetRange.t → Maybe OffsetRange.t
-handle-offset-change c r =
-  if OffsetRange.end r < c .range .start then just r
-  else if Change.influences? r c then nothing
-  else just (OffsetRange.shift (c .by ⊝ c .range .length) r)
-
-handle-tokens-change : List Token.t → Change.t → List Token.t
-handle-tokens-change tokens change = tokens |> map-Maybe λ token →
-  token .range
-  |> handle-offset-change change
-  |> fmap (set-token-range token)
-
-handle-ips-change : List InteractionPoint.t → Change.t → List InteractionPoint.t
-handle-ips-change ips change = ips |> map-Maybe λ ip@(mkInteractionPoint id ip-range) →
-  if (change .range .start == ip-range .start) ∧ (change .range .start + change .by - 1 == OffsetRange.end ip-range)
-    then pure ip
-    else do
-      start-marker ← offset-range (ip-range .start) 2 |> handle-offset-change change
-      end-marker ← offset-range (OffsetRange.end ip-range - 1) 2 |> handle-offset-change change
-      pure $ mkInteractionPoint id (offset-range (start-marker .start) (end-marker .start + 2 - start-marker .start))
 
 update-input-mode : Trie.t → DecorationType.t → StatusBarItem.t → IO.Ref.t InputMode.Model → InputMode.Msg → IO ⊤
 update-input-mode t d stb input-mode-model msg = TextEditor.active-editor >>= λ where
@@ -172,10 +150,9 @@ with-current-file : (TextEditor.t → TextDocument.t → File → IO File) → M
 with-current-file f model = TextEditor.active-editor >>= maybe (pure model) λ e →
   TextEditor.document e >>= λ doc → model |> with-loaded-file (TextDocument.file-name doc) (f e doc)
 
-jump-to-position : TextDocument.t → Nat → IO ⊤
-jump-to-position doc offset =
+jump-to-position : TextDocument.t → Position.t → IO ⊤
+jump-to-position doc pos =
   let uri = TextDocument.uri doc in
-  let pos = TextDocument.position-at doc offset in
   tt <$ Window.show-text-document uri record
     { preserve-focus = true
     ; preview = false
@@ -183,13 +160,14 @@ jump-to-position doc offset =
     ; view-column = ViewColumn.active
     }
 
-jump-to-goal : Model → (Nat → List InteractionPoint.t → Maybe InteractionPoint.t) → IO Model
+jump-to-goal : Model → (Position.t → List InteractionPoint.t → Maybe InteractionPoint.t) → IO Model
 jump-to-goal model find-next = model |> with-current-file λ ed doc file → do
-  o ← ⦇ TextDocument.offset-at (TextEditor.document ed) (TextEditor.cursor-pos ed) ⦈
-  find-next o (file .interaction-points) |> maybe (pure file) λ ip → file <$ jump-to-position doc (ip .range .start + 3)
+  pos ←(TextEditor.cursor-pos ed)
+  find-next pos (file .interaction-points) |> maybe (pure file) λ ip →
+    file <$ jump-to-position doc (Position.right 3 (Range.start (ip .range)))
 
 compare-doc : TextDocument.t → TextDocument.t → Bool
-compare-doc = (Uri.to-string ∘ TextDocument.uri) on String._==_
+compare-doc = String._==_ on (Uri.to-string ∘ TextDocument.uri)
 
 get-editor-from-document : TextDocument.t → IO (Maybe TextEditor.t)
 get-editor-from-document doc = do
@@ -198,7 +176,7 @@ get-editor-from-document doc = do
 
 on-interaction-point? : List InteractionPoint.t → Change.t → Bool
 on-interaction-point? ips change = ips
-  |> List.any λ ip → OffsetRange.equals? (ip .range) (Change.new-range change)
+  |> List.any λ ip → Range.equals? (ip .range) (change .source-range)
 
 activate : IO ⊤
 activate = try λ _ → do
@@ -244,11 +222,11 @@ activate = try λ _ → do
 
   register-command "agda-mode.next-goal" $ do
     model ← IO.Ref.get model-ref
-    tt <$ jump-to-goal model λ o ips → find (λ ip → ip .range .start + 3 > o) ips <|> (ips !! 0)
+    tt <$ jump-to-goal model λ o ips → find ((_> o) ∘ InteractionPoint.cursor-position) ips <|> (ips !! 0)
 
   register-command "agda-mode.prev-goal" $ do
     model ← IO.Ref.get model-ref
-    tt <$ jump-to-goal model λ o ips → find (λ ip → ip .range .start + 3 < o) (reverse ips) <|> (reverse ips !! 0)
+    tt <$ jump-to-goal model λ o ips → find ((_< o) ∘ InteractionPoint.cursor-position) (reverse ips) <|> (reverse ips !! 0)
 
   forM (StringMap.entries show-general-info-cmds) λ (name , cmd) →
     register-command-with-args name λ o → do
@@ -312,7 +290,7 @@ activate = try λ _ → do
         (just (mkFile ips tokens)) → do
           get-editor-from-document doc >>= maybe (pure tt) λ e → do
             apply-decorations hd-map e tokens
-            let ranges = map (OffsetRange.to-vsc-range doc ∘ InteractionPoint.range) ips
+            let ranges = map InteractionPoint.range ips
             TextEditor.set-decoration (model .ip-decoration) ranges e
           apply-semantic-tokens doc tokens
         nothing → throw "Busy")
@@ -322,55 +300,25 @@ activate = try λ _ → do
   DefinitionProvider.register (language "agda" ∩ scheme "file") =<<
     DefinitionProvider.new λ doc pos tok → agda .response-queue |> JobQueue.await-push (do
       model ← IO.Ref.get model-ref
-      let offset = TextDocument.offset-at doc pos
       from-Maybe (pure nothing) $ do
         mkFile ips tokens ← model .loaded-files !? TextDocument.file-name doc
-        token ← find (λ tok → OffsetRange.contains? (tok .range) offset) tokens
+        token ← find (Range.contains? pos ∘ Token.range) tokens
         site ← token .definition-site
         just $ do
           other ← TextDocument.open-path (site .filepath)
           let pos = TextDocument.position-at other (site .position - 1)
           pure (just $ Location.new (TextDocument.uri other) pos))
 
-  Workspace.on-did-change-text-document λ e → agda .response-queue |> JobQueue.await-push (do
-    model ← IO.Ref.get model-ref
-    model .loaded-files !? TextDocument.file-name (e .document) |> λ where
-      (just (mkFile ips tokens)) →
-        -- The changes this handler receives are not yet sorted and shifted, so we need to do that ourselves
-        -- to be able to compare changes to exisiting interaction points locations.
-        let changes = e .content-changes
-              |> map Change.from-TextDocumentContentChangeEvent
-              |> sort-on (λ change → change .range .start)
-              |> foldl ([] , Int.pos 0) (λ (res , Δ) change → (res <> [ Change.shift Δ change ]) , (Δ Int.+ (change .by ⊝ change .range .length)))
-              |> Σ.fst in
-        let new-tokens = changes |> foldl tokens handle-tokens-change in
-
-        -- If one of the changes involved the insertion of a newly dug goal, then we need to do some extra work,
-        -- Otherwise, we take a shortcut to keep the processing time on each edit minimal.
-        let new-ips =
-              if List.any (λ change → change .text String.== "{!  !}") (e .content-changes) then (
-                -- We partition the list of interaction points into
-                -- * a list of ips that have been dug in these changes, i.e. changes that fall exactly over an
-                --   interaction point in the cache;
-                -- * a list of ips that need to be shifted as regular.
-                let overwritten-ips , affected-ips = partition (λ ip → List.any (λ change → OffsetRange.equals? (Change.new-range change) (ip .range)) changes) ips in
-                changes |> foldl affected-ips handle-ips-change |> append overwritten-ips
-              ) else (changes |> foldl ips handle-ips-change) in
-
-        IO.Ref.set model-ref record model
-          { loaded-files = model .loaded-files [ TextDocument.file-name (e .document) ]:= mkFile new-ips new-tokens }
-      nothing → pure tt
-    EventEmitter.fire (model .tokens-request-emitter) tt)
-
   HoverProvider.register (language "agda" ∩ scheme "file") λ doc pos tok → do
     model ← IO.Ref.get model-ref
-    let offset = TextDocument.offset-at doc pos
     pure $ do
       mkFile ips tokens ← model .loaded-files !? TextDocument.file-name doc
-      token ← find (λ tok → OffsetRange.contains? (tok .range) offset) tokens
+      token ← find (Range.contains? pos ∘ Token.range) tokens
       token .note |> λ where
         "" → nothing
-        note → just (mkHover [ MarkdownString.new note ] (just (OffsetRange.to-vsc-range doc (token .range))))
+        note → just (mkHover [ MarkdownString.new note ] (just (token .range)))
+
+  register-change-handler agda model-ref
 
   input-mode-model ← IO.Ref.new $ InputMode.Model ∋ nothing
   let uim x = do IO.Ref.get model-ref >>= λ model → update-input-mode (model .keymap) (model .underline-decoration) (model .input-mode-status-item) input-mode-model x
@@ -382,6 +330,6 @@ activate = try λ _ → do
   register-command-with-args "type" λ args →
     required "text" (InputMode.character <$> string) args |> maybe (pure tt) uim
 
-  trace "Started extension"
+  trace "Started extensionn"
 
   pure tt

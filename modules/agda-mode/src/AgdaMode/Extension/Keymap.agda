@@ -14,6 +14,7 @@ open import Data.Nat renaming (_==_ to _≡ⁿ_)
 open import Data.Bool
 open import Agda.Builtin.Unit
 open import Function
+open import Class.Ord
 
 open import Effect.Monad
 
