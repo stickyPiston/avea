@@ -114,6 +114,10 @@ shift-changes changes =
   -- only exists at runtime of the extension, and NOT at import time. This can be fixed
   -- once FOREIGN JS is released.
   let origin = Position.new 0 0 in
+
+  -- Change.t and Combine form a Semigroup, but there is not an identity element that satisfies the laws.
+  -- However, since we traverse the changes in order from start to end, the accumulated change starting
+  -- from the origin will be enough information to shift the remaining changes.
   let empty-change = mkChange (Range.new origin origin) origin in
   changes
     |> (foldl (empty-change , []) λ (acc , res) change →
@@ -121,10 +125,15 @@ shift-changes changes =
       Change.combine acc transformed-change , res <> [ transformed-change ])
     |> Σ.snd
 
+-- Assumption: the range is single-line (holds for all tokens and interaction points)
 handle-offset-change : Change.t → Range.t → Maybe Range.t
 handle-offset-change c r =
-  if Position.before? (Range.end r) (Range.start $ c .source-range) then just r
+  -- If the range comes before the change, then it is not affected
+  if Range.end r < Range.start (c .source-range) then just r
+  -- If the range and change intersect, then remove the token from the list
   else if Change.influences? r c then nothing
+  -- Otherwise, shift the start position and calculate the end of the
+  -- range based on the original range's length.
   else
     let shifted-start-pos = shift-pos c $ Range.start r in
     just (Range.new shifted-start-pos $ Position.right (Range.length r) shifted-start-pos)
@@ -134,12 +143,12 @@ affected-by? c t =
   if Change.within-line? c then Position.line (c .end-pos) == Position.line (Range.start $ t .range)
   else true
 
-postulate tap : {A : Set} → (A → String) → A → A
-{-# COMPILE JS tap = A => show => a => { console.log(show(a)); return a } #-}
-
 handle-tokens-change : List Token.t → Change.t → List Token.t
 handle-tokens-change tokens change =
+  -- We will search for the part of the token list that will be affected by the change.
   let prefix , rest = tokens |> span (λ t → Range.end (t .range) < Range.start (change .source-range)) in
+
+  -- Additionally, if the change introduces no newlines, then we only update the tokens in that line. 
   let need-shifting-tokens , suffix = rest |> span (affected-by? change) in
   let shifted-tokens = need-shifting-tokens |> map-Maybe λ token →
         token .range
@@ -155,10 +164,6 @@ handle-ips-change doc ips change = ips |> map-Maybe λ ip@(mkInteractionPoint id
     start-marker ← InteractionPoint.start-marker ip |> handle-offset-change change
     end-marker ← InteractionPoint.end-marker ip |> handle-offset-change change
     pure $ mkInteractionPoint id (start-marker Range.∪ end-marker)
-
-private
-  postulate trace : {A : Set} → A → IO ⊤
-  {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
 
 register-change-handler : AgdaProcess.t → Ref.t Model → IO ⊤
 register-change-handler agda model-ref =
