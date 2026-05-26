@@ -21,7 +21,7 @@ not : 𝔹 → 𝔹
 not true = false
 not false = true
 
-infixl 3 _∧_ _∨_
+infixl 3 _∧_ _∨_ _⇒_
 
 _∧_ : 𝔹 → 𝔹 → 𝔹
 false ∧ b = false
@@ -30,3 +30,6 @@ _ ∧ b = b
 _∨_ : 𝔹 → 𝔹 → 𝔹
 true ∨ b = true
 _ ∨ b = b
+
+_⇒_ : Bool → Bool → Bool
+a ⇒ b = a ∨ not b

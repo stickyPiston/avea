@@ -35,9 +35,6 @@ module Change where
       end-pos : Position.t
   open t public
 
-  start-line : t → Nat
-  start-line (mkChange src _) = Position.line $ Range.start src
-
   replacement-range : TextDocument.t → t → Range.t
   replacement-range doc change =
     Range.new (Range.start $ change .source-range) (change .end-pos)
@@ -53,6 +50,11 @@ module Change where
   influences? : Range.t → t → Bool
   influences? range (mkChange source-range single-line-replacements) =
     from-Maybe false (not ∘ Range.empty? <$> range Range.∩ source-range)
+
+  within-line? : t → Bool
+  within-line? c =
+      Range.single-line? (c .source-range)
+    ∧ Position.line (Range.start $ c .source-range) == Position.line (c .end-pos)
 
   open TextDocumentContentChangeEvent hiding (t)
 
@@ -127,11 +129,23 @@ handle-offset-change c r =
     let shifted-start-pos = shift-pos c $ Range.start r in
     just (Range.new shifted-start-pos $ Position.right (Range.length r) shifted-start-pos)
 
+affected-by? : Change.t → Token.t → Bool
+affected-by? c t =
+  if Change.within-line? c then Position.line (c .end-pos) == Position.line (Range.start $ t .range)
+  else true
+
+postulate tap : {A : Set} → (A → String) → A → A
+{-# COMPILE JS tap = A => show => a => { console.log(show(a)); return a } #-}
+
 handle-tokens-change : List Token.t → Change.t → List Token.t
-handle-tokens-change tokens change = tokens |> map-Maybe λ token →
-  token .range
-  |> handle-offset-change change
-  |> fmap λ range → record token { range = range }
+handle-tokens-change tokens change =
+  let prefix , rest = tokens |> span (λ t → Range.end (t .range) < Range.start (change .source-range)) in
+  let need-shifting-tokens , suffix = rest |> span (affected-by? change) in
+  let shifted-tokens = need-shifting-tokens |> map-Maybe λ token →
+        token .range
+        |> handle-offset-change change
+        |> fmap λ range → record token { range = range } in
+  prefix <> shifted-tokens <> suffix
 
 handle-ips-change : TextDocument.t → List InteractionPoint.t → Change.t → List InteractionPoint.t
 handle-ips-change doc ips change = ips |> map-Maybe λ ip@(mkInteractionPoint id ip-range) →

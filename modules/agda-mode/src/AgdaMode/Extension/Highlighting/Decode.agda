@@ -165,6 +165,13 @@ module Token where
     tb? ← required "tokenBased" Decode.string <&> ("TokenBased" String.==_)
     range-factory ← required "range" range-decoder
     pure $ λ doc → mk-Token pas sas note ds tb? (range-factory doc)
+
+  instance
+    Ord-Token : Ord t
+    Ord-Token = record { compare = compare on range }
+
+    Show-Token : Show t
+    Show-Token = record { show = λ t → show (t .range) }
 open Token using (primary ; secondary ; note ; definition-site ; token-based ; range) public
 
 highlighting-info-decoder : Decoder (TextDocument.t → List Token.t × Bool)

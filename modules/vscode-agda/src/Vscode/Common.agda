@@ -131,9 +131,15 @@ module Range where
   length : t → Nat
   length r = Position.char (end r) - Position.char (start r)
 
+  postulate single-line? : t → Bool
+  {-# COMPILE JS single-line? = c => c.isSingleLine #-}
+
   instance
     Show-Range : Show t
     Show-Range = record { show = λ r → "[" <> show (start r) <> "-" <> show (end r) <> ")" }
+
+    Ord-Range : Ord t
+    Ord-Range = record { compare = λ l r → compare (start l , end l) (start r , end r) }
 
 module TextLine where
     postulate t : Set

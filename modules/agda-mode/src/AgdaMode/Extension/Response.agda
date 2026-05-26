@@ -17,6 +17,7 @@ open import Data.Product
 open import Data.JSON.Decode
 open import Agda.Builtin.Unit
 open import Agda.Builtin.Char
+open import Class.Show
 
 open import Function hiding (id)
 open import Level
@@ -42,6 +43,11 @@ private variable
   a : Level
   A : Set a
 
+
+private
+  postulate trace : {A : Set} → A → IO ⊤
+  {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
+
 kind-decoder : Decoder String
 kind-decoder = required "kind" string
 
@@ -58,11 +64,11 @@ handle-highlighting-info model f = do
 
   m ← model .loaded-files !? TextDocument.file-name doc |> λ where
     nothing → pure record model
-      { loaded-files = model .loaded-files [ TextDocument.file-name doc ]:= mkFile [] token-list
+      { loaded-files = model .loaded-files [ TextDocument.file-name doc ]:= mkFile [] (sort-Ord token-list)
       }
     (just file) → pure record model
       { loaded-files = model .loaded-files [ TextDocument.file-name doc ]:=
-          record file { tokens = (if remove then token-list else file .tokens ++ˡ token-list) }
+          record file { tokens = sort-Ord (if remove then token-list else file .tokens ++ˡ token-list) }
       }
   
   EventEmitter.fire (model .tokens-request-emitter) tt
@@ -162,10 +168,6 @@ handle-jump-to-error model jump-to-error = do
     ; view-column = ViewColumn.active
     }
   pure model
-
-private
-  postulate trace : {A : Set} → A → IO ⊤
-  {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
 
 -- TODO: Change this to have type Decoder (Model → IO Model)
 handle-agda-message : (AgdaInteraction.t → IO ⊤) → Ref.t Model → Model → Decoder (IO Model)

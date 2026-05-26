@@ -113,12 +113,18 @@ take-while p (x ∷ xs) = if p x then x ∷ take-while p xs else []
   return i === -1 ? xs : xs.slice(0, i);
 } #-}
 
+postulate drop-while : (A → Bool) → List A → List A
+{-# COMPILE JS drop-while = a => A => p => xs => {
+  const i = xs.findIndex(x => !p(x));
+  return i === -1 ? xs : xs.slice(i);
+} #-}
+
 postulate span : (A → Bool) → List A → List A × List A
 {-# COMPILE JS span = a => A => p => xs => {
   const i = xs.findIndex(x => !p(x));
   return i === -1
     ? { "_,_": y => y["_,_"](xs, []) }
-    : { "_,_": y => y["_,_"](xs.slice(0, i), x.slice(i)) };
+    : { "_,_": y => y["_,_"](xs.slice(0, i), xs.slice(i)) };
 } #-}
 
 -- TODO: This function is a little dubious, probably needs to be fixed
