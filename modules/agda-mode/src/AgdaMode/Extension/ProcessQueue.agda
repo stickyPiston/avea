@@ -85,14 +85,7 @@ module AgdaProcess where
       Ref.get (t .process) >>= Process.write (show intr))
 
   private
-    -- Some responses from the interaction mode might start with "JSON> ", so we strip
-    -- those if they are present to make sure the JSON parser can parse the actual JSON.
-    strip-prompt : String → String
-    strip-prompt s = s |> _starts-with "JSON> " |> λ where
-      true → slice 6 ∥ s ∥ s
-      false → s
-
-    -- Once we have a response string, we can parse it into JSON and run one of the many
+    -- Once we have a immediate response json, we can run one of the many
     -- response decoders and handler on it. These will update the model mutable variable,
     -- which is safe since this handler will be executed as a job in the `JobQueue.t`.
     handle-immediate-response : OutputChannel.t → Ref.t Model → JSON → Ref.t Process.t → JobQueue.Job
@@ -119,6 +112,11 @@ module AgdaProcess where
       OutputChannel.trace ("Spawning process: " ++ cmd-name ++ " " ++ intercalate " " args) output-chan
       Process.spawn cmd-name args
 
+    -- We classify Agda responses in two categories:
+    -- * Immediate responses are ones that should be processed as soon as they are parsed.
+    -- * Specific responses need not be processed immediately, so they are bundled together
+    --   with the interaction that triggered them, so that the interaction can be processed 
+    --   as one whole unit, rather than separate messages.
     immediate-kind? : String → Bool
     immediate-kind? s =
       let kinds = "ClearHighlighting" ∷ "HighlightingInfo" ∷ "ClearRunningInfo" ∷ "RunningInfo" ∷ "Status" ∷ [] in
@@ -133,18 +131,19 @@ module AgdaProcess where
     empty-string? "" = true
     empty-string? _ = false
 
-    -- Whenever a buffer of data is received, we append to it to previously read and unparsed data.
-    -- This complete buffer is split on newlines and the "JSON >" prompts are removed. All of the
-    -- full lines should be JSON strings with responses, and jobs to parse and handle them will be pushed
-    -- to the job queue.
+    -- The data handler uses the previous buffers for interactions and responses, and the received
+    -- buffer to add jobs to the queue for immediate and non-immediate responses.
     on-data-handler : Ref.t Process.t → (res-queue send-queue : JobQueue.t) → Ref.t Model → OutputChannel.t → Ref.t String → Buffer.t → IO ⊤
     on-data-handler proc-ref res-queue send-queue model-ref output-chan stdout-buffer received-buffer = do
       model ← Ref.get model-ref
       let interaction-queue = model .interaction-queue
 
+      -- Load the previous incomplete line and prepend it to the received buffer
       buffer ← (_++ Buffer.to-string received-buffer) <$> Ref.get stdout-buffer
       let init-intrs , last-intr = split buffer "JSON> " |> NE.map lines |> NE.unsnoc
 
+      -- The last line of the last interaction is an incomplete json response, so we save it for
+      -- the next data handler invocation.
       let last-intr , new-buffer = NE.unsnoc last-intr
       Ref.set stdout-buffer new-buffer
 
@@ -153,18 +152,28 @@ module AgdaProcess where
             |> List.map (List.partition-Either ∘ List.map parse-json-Either ∘ List.filter (not ∘ empty-string?) ∘ NE.to-List)
             |> List.unzip
       errors |> List.concat |> mapM λ error → OutputChannel.error error output-chan
+
+      -- Restore the previous incomplete interaction, that is the previous non-immediate interactions that
+      -- still belong to the top interaction of the interaction queue
       let lines-per-intr = NE.snoc init-intr (List.map-Maybe parse-json last-intr)
             |> λ { (x :| xs) → (model .current-interaction <> x) :| xs }
 
+      -- Split the list of all responses into a list of
+      -- * immediate responses from all interactions;
+      -- * the responses grouped by their complete interaction;
+      -- * the responses of the incomplete interaction that will be completed in a later data handler invocation.
       let immediate-responses , (complete-intrs , incomplete-intr) = lines-per-intr
             |> NE.map (List.partition (from-Maybe false ∘ fmap immediate-kind? ∘ required "kind" string))
             |> NE.unzip
             |> map-first (List.concat ∘ NE.to-List)
             |> map-second NE.unsnoc
 
+      -- Process the immediate responses
       immediate-responses |> mapM λ immediate →
         res-queue |> JobQueue.push (handle-immediate-response output-chan model-ref immediate proc-ref)
 
+      -- For each complete interaction, zip it with the interaction that it triggered saved in the queue.
+      -- Then process the bundled responses in the interaction handler.
       complete-intrs
         |> List.zip interaction-queue
         |> mapM λ (intr , intr-res) → do
@@ -186,8 +195,8 @@ module AgdaProcess where
     {-# TERMINATING #-}
     mutual
       -- A child process calls this handler when:
-      -- - The process failed to spawn or has unexpectedly exited
-      -- - A message fails to send
+      -- * The process failed to spawn or has unexpectedly exited;
+      -- * A message fails to send.
       -- There is not much we do can other than allow the user to restart the process.
       on-error-handler : Ref.t Process.t → (res-queue send-queue : JobQueue.t) → Ref.t Model → OutputChannel.t → String → Bool → IO ⊤
       on-error-handler proc-ref res-queue send-queue model-ref output-chan msg is-ENOENT = do
@@ -233,6 +242,7 @@ module AgdaProcess where
     -- receiving new interactions from the extension. The on-data handler will start
     -- the send queue once the handler is initialised.
     JobQueue.pause (t .send-queue)
+
     stop output-chan t
     proc ← spawn-proc output-chan
     Ref.set (t .process) proc
