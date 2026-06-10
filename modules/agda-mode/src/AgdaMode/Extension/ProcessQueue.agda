@@ -52,6 +52,13 @@ module JobQueue where
   postulate await-push : {A : Set} → IO A → t → IO A
   {-# COMPILE JS await-push = A => job => q => async () => { return await q.add(job) } #-}
 
+  postulate start pause : t → IO ⊤
+  {-# COMPILE JS start = q => async () => { q.start(); return a => a["tt"]() } #-}
+  {-# COMPILE JS pause = q => async () => { q.pause(); console.log(q.isPaused); return a => a["tt"]() } #-}
+
+  postulate paused? : t → IO Bool
+  {-# COMPILE JS paused? = q => async () => { return q.isPaused } #-}
+
 private
   postulate trace : {A : Set} → A → IO ⊤
   {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
@@ -62,16 +69,19 @@ module AgdaProcess where
   record t : Set where field
     process : Ref.t Process.t
     response-queue : JobQueue.t
+    send-queue : JobQueue.t
   open t public
 
-  -- We can send as many interactions to the Agda compiler without compromising the order of the responses or the
-  -- the quality of the messages. This means we don't need to make and use a separate `JobQueue.t`.
+  -- Sent interactions are first put into a queue, so that the handler can have some time to initialise
+  -- before any messages are sent. This prevents the interaction-queue to be zipped with the initial JSON>
+  -- message causing the interaction queue to fall behind on the actually sent interactions.
   send-command : OutputChannel.t → Ref.t Model → AgdaInteraction.t → t → IO ⊤
   send-command output-chan model-ref intr t = do
     OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
-    model-ref |> Ref.modify λ model → record model
-      { interaction-queue = model .interaction-queue |> Queue.enqueue intr }
-    Ref.get (t .process) >>= Process.write (show intr) 
+    t .send-queue |> JobQueue.push (do
+      model-ref |> Ref.modify λ model → record model
+        { interaction-queue = model .interaction-queue |> Queue.enqueue intr }
+      Ref.get (t .process) >>= Process.write (show intr))
 
   private
     -- Some responses from the interaction mode might start with "JSON> ", so we strip
@@ -117,8 +127,8 @@ module AgdaProcess where
     -- This complete buffer is split on newlines and the "JSON >" prompts are removed. All of the
     -- full lines should be JSON strings with responses, and jobs to parse and handle them will be pushed
     -- to the job queue.
-    on-data-handler : Ref.t Process.t → JobQueue.t → Ref.t Model → OutputChannel.t → Ref.t String → Buffer.t → IO ⊤
-    on-data-handler proc-ref res-queue model-ref output-chan stdout-buffer received-buffer = do
+    on-data-handler : Ref.t Process.t → (res-queue send-queue : JobQueue.t) → Ref.t Model → OutputChannel.t → Ref.t String → Buffer.t → IO ⊤
+    on-data-handler proc-ref res-queue send-queue model-ref output-chan stdout-buffer received-buffer = do
       model ← Ref.get model-ref
       let interaction-queue = model .interaction-queue
 
@@ -148,6 +158,13 @@ module AgdaProcess where
           OutputChannel.trace ("Completed interaction: " <> show intr) output-chan
           res-queue |> JobQueue.push (handle-interaction-result output-chan model-ref intr-res proc-ref)
 
+      -- Agda will send an initial JSON> prompt to indicate it is ready to receive interactions,
+      -- so we wait for that to be parsed, then we start the send queue.
+      send-paused? ← JobQueue.paused? send-queue
+      when (send-paused? ∧ not (List.null? complete-intrs)) $ do
+        OutputChannel.trace "Finished initialisation of the Agda process stdout data handler" output-chan
+        JobQueue.start send-queue
+
       Ref.set model-ref record model
         { interaction-queue = Queue.skip List.∥ complete-intrs ∥ interaction-queue
         ; current-interaction = incomplete-intr
@@ -159,8 +176,8 @@ module AgdaProcess where
       -- - The process failed to spawn or has unexpectedly exited
       -- - A message fails to send
       -- There is not much we do can other than allow the user to restart the process.
-      on-error-handler : Ref.t Process.t → JobQueue.t → Ref.t Model → OutputChannel.t → String → Bool → IO ⊤
-      on-error-handler proc-ref res-queue model-ref output-chan msg is-ENOENT = do
+      on-error-handler : Ref.t Process.t → (res-queue send-queue : JobQueue.t) → Ref.t Model → OutputChannel.t → String → Bool → IO ⊤
+      on-error-handler proc-ref res-queue send-queue model-ref output-chan msg is-ENOENT = do
         OutputChannel.error ("Agda process error: " ++ msg) output-chan
 
         -- When the binary could not be spawed, give a specicialsed message and an additional button in the
@@ -175,20 +192,20 @@ module AgdaProcess where
           (just "Restart Agda") → do
             proc ← spawn-proc output-chan
             Ref.set proc-ref proc
-            setup-handlers proc-ref res-queue model-ref output-chan
+            setup-handlers proc-ref res-queue send-queue model-ref output-chan
           (just "Open settings") → execute-command "workbench.action.openSettings" "agda-mode.agda-path"
           _ → pure tt
 
-      setup-handlers : Ref.t Process.t → JobQueue.t → Ref.t Model → OutputChannel.t → IO ⊤
-      setup-handlers proc-ref res-queue model-ref output-chan = do
+      setup-handlers : Ref.t Process.t → (res-queue send-queue : JobQueue.t) → Ref.t Model → OutputChannel.t → IO ⊤
+      setup-handlers proc-ref res-queue send-queue model-ref output-chan = do
         proc ← Ref.get proc-ref
         stdout-buffer ← Ref.new ""
 
         -- The handlers for these event listeners have been extracted because of a compilation bug in Agda.
         -- When pattern matching directly in this function, the code in the pattern match arms is not
         -- executed for some reason.
-        Process.on-data proc (on-data-handler proc-ref res-queue model-ref output-chan stdout-buffer)
-        Process.on-error proc (on-error-handler proc-ref res-queue model-ref output-chan)
+        Process.on-data proc (on-data-handler proc-ref res-queue send-queue model-ref output-chan stdout-buffer)
+        Process.on-error proc (on-error-handler proc-ref res-queue send-queue model-ref output-chan)
 
   stop : OutputChannel.t → t → IO ⊤
   stop output-chan t = do
@@ -199,10 +216,14 @@ module AgdaProcess where
   -- in the mutable variable. Then we set up all the handlers again.
   restart : OutputChannel.t → Ref.t Model → t → IO ⊤
   restart output-chan model-ref t = do
+    -- Pause the send queue so that the new process has time to initialise before
+    -- receiving new interactions from the extension. The on-data handler will start
+    -- the send queue once the handler is initialised.
+    JobQueue.pause (t .send-queue)
     stop output-chan t
     proc ← spawn-proc output-chan
     Ref.set (t .process) proc
-    setup-handlers (t .process) (t .response-queue) model-ref output-chan
+    setup-handlers (t .process) (t .response-queue) (t .send-queue) model-ref output-chan
 
   -- Spawn a new `AgdaProcess.t` and immediately bind to the output on the stdout channel, which
   -- When messages arrive on the output channel, they will be handled via a `JobQueue.t`.
@@ -210,10 +231,16 @@ module AgdaProcess where
   spawn output-chan model-ref = do
     proc ← spawn-proc output-chan
     proc-ref ← Ref.new proc
-    res-queue ← JobQueue.new 
-    setup-handlers proc-ref res-queue model-ref output-chan
+    res-queue ← JobQueue.new
+    send-queue ← JobQueue.new ; JobQueue.pause send-queue
+    setup-handlers proc-ref res-queue send-queue model-ref output-chan
 
+    let r = record
+          { process = proc-ref
+          ; response-queue = res-queue
+          ; send-queue = send-queue
+          }
     -- The disposable for an `AgdaProcess.t` calls `Process.kill`, which kills the child process gracefully.
     -- It will also cancel the on-data event listener created earlier.
-    pure $ record { process = proc-ref ; response-queue = res-queue } , Disposable.new (Process.kill proc)
+    pure $ r , Disposable.new (Process.kill proc)
 open AgdaProcess using (response-queue ; process) public
