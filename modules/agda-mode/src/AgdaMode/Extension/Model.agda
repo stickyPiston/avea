@@ -8,12 +8,14 @@ open import Data.String
 import Data.String as String
 open import Data.Map
 open import Data.List hiding (_++_ ; head)
+open import Data.List.Queue
 open import Data.Product
 open import Data.Nat
 import Data.Nat as Nat
 open import Data.Bool
 open import Function hiding (id)
 open import Data.IO
+open import Data.JSON hiding (encode)
 open import Data.JSON.Decode
 open import Effect.Monad
 
@@ -93,20 +95,6 @@ record File : Set where
     interaction-points : List InteractionPoint.t
     tokens : List Token.t
 open File public
-
-record Model : Set where field
-  panel : Maybe (Panel.t ⊤)
-  status-bar-item : StatusBarItem.t
-  input-mode-status-item : StatusBarItem.t
-  agda : Maybe Process.t
-  stdout-buffer : String
-  current-doc : Maybe TextDocument.t
-  loaded-files : StringMap.t File
-  tokens-request-emitter : EventEmitter.t ⊤
-  running-info : String
-  underline-decoration ip-decoration : DecorationType.t
-  keymap : Trie.t
-open Model public
 
 module Rewrite where
   data t : Set where
@@ -197,7 +185,7 @@ module AgdaCommand where
   show-pos : Position.t → TextDocument.t → String
   show-pos pos doc =
     let offset = TextDocument.offset-at doc pos
-     in "Pn () " ++ show (offset + 1) ++ " " ++ show (Position.line pos) ++ " " ++ show (Position.char pos)
+     in "Pn () " ++ show (offset + 1) ++ " " ++ show (Position.line pos + 1) ++ " " ++ show (Position.char pos + 1)
 
   show-range : TextDocument.t → Range.t → String
   show-range doc range =
@@ -277,25 +265,40 @@ module AgdaInteraction where
   from-AgdaCommand cmd = do
     just e ← TextEditor.active-editor where _ → pure nothing
     doc ← TextEditor.document e
-    pure $ just (iotcm doc cmd)
+    pure $ just (iotcm doc cmd) 
+open AgdaInteraction using (iotcm ; file ; command) public
 
-  under-cursor-command : Model → (InteractionPoint.t → AgdaCommand.t) → IO (Maybe t)
-  under-cursor-command model cmd = do
-    just e ← TextEditor.active-editor where _ → pure nothing
-    doc ← TextEditor.document e
-    cursor ← TextEditor.cursor-pos e
-    model .loaded-files !? TextDocument.file-name doc |> maybe (pure nothing) λ (record { interaction-points = ips }) → do
-     ips |> find (λ ip → Range.contains? cursor (ip .range)) |> maybe (pure nothing) λ ip → do
+record Model : Set where field
+  panel : Maybe (Panel.t ⊤)
+  status-bar-item : StatusBarItem.t
+  input-mode-status-item : StatusBarItem.t
+  agda : Maybe Process.t
+  stdout-buffer : String
+  current-doc : Maybe TextDocument.t
+  loaded-files : StringMap.t File
+  tokens-request-emitter : EventEmitter.t ⊤
+  running-info : String
+  underline-decoration ip-decoration : DecorationType.t
+  keymap : Trie.t
+  interaction-queue : List AgdaInteraction.t
+  current-interaction : List JSON
+open Model public
+
+under-cursor-command : Model → (InteractionPoint.t → AgdaCommand.t) → IO (Maybe AgdaInteraction.t)
+under-cursor-command model cmd = do
+  just e ← TextEditor.active-editor where _ → pure nothing
+  doc ← TextEditor.document e
+  cursor ← TextEditor.cursor-pos e
+  model .loaded-files !? TextDocument.file-name doc |> maybe (pure nothing) λ (record { interaction-points = ips }) → do
+    ips |> find (λ ip → Range.contains? cursor (ip .range)) |> maybe (pure nothing) λ ip → do
       pure $ just (iotcm doc (cmd ip))
 
-  input-prompt-command : (String → AgdaCommand.t) → IO (Maybe t)
-  input-prompt-command cmd = do
-    just e ← TextEditor.active-editor where _ → pure nothing
-    doc ← TextEditor.document e
-    input ← from-Maybe "" <$> Window.show-input-box
-    pure $ just (iotcm doc (cmd input))
-    
-open AgdaInteraction using (iotcm ; file ; command) public
+input-prompt-command : (String → AgdaCommand.t) → IO (Maybe AgdaInteraction.t)
+input-prompt-command cmd = do
+  just e ← TextEditor.active-editor where _ → pure nothing
+  doc ← TextEditor.document e
+  input ← from-Maybe "" <$> Window.show-input-box
+  pure $ just (iotcm doc (cmd input))
 
 module Config where
   record t : Set where

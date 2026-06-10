@@ -2,7 +2,9 @@ module AgdaMode.Extension.ProcessQueue where
 
 open import Data.Bool
 import Data.List as List
-open List using ([_] ; _∷_ ; [] ; filter)
+open List using (List ; [_] ; _∷_ ; [] ; filter)
+open import Data.List.NonEmpty
+open import Data.List.Queue
 open import Data.IO
 open import Data.Maybe
 open import Data.Maybe.Effectful
@@ -13,6 +15,7 @@ open import Data.JSON
 open import Data.Nat
 open import Data.Map
 open import Data.JSON.Decode
+open import Data.String as String
 
 open import AgdaMode.Extension.Model
 open import AgdaMode.Extension.Response
@@ -25,33 +28,9 @@ open import Vscode.Command
 
 open import Node.Process
 
+open import Class.Monoid
 open import Class.Show
 open import Class.Ord
-
-module Queue where
-  open import Data.List hiding (null?)
-  open import Data.List using (null?) public
-
-  private variable
-    A : Set
-
-  t : Set → Set
-  t = List
-
-  empty : t A
-  empty = []
-
-  enqueue : A → t A → t A
-  enqueue a q = q ++ [ a ]
-  {-# COMPILE JS enqueue = A => a => q => [...q, a] #-}
-
-  dequeue : t A → Maybe (A × t A)
-  dequeue [] = nothing
-  dequeue (x ∷ q) = just (x , q)
-  {-# COMPILE JS dequeue = A => q => {
-    if (q.length) return a => a["just"]({ "_,_": b => b["_,_"](q[0], q.slice(1)) });
-    else return a => a["nothing"]();
-  } #-}
 
 open import Effect.Monad
 open Monad {{ ... }}
@@ -73,6 +52,10 @@ module JobQueue where
   postulate await-push : {A : Set} → IO A → t → IO A
   {-# COMPILE JS await-push = A => job => q => async () => { return await q.add(job) } #-}
 
+private
+  postulate trace : {A : Set} → A → IO ⊤
+  {-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
+
 module AgdaProcess where
   open import Data.String
 
@@ -83,9 +66,11 @@ module AgdaProcess where
 
   -- We can send as many interactions to the Agda compiler without compromising the order of the responses or the
   -- the quality of the messages. This means we don't need to make and use a separate `JobQueue.t`.
-  send-command : OutputChannel.t → AgdaInteraction.t → t → IO ⊤
-  send-command output-chan intr t = do
+  send-command : OutputChannel.t → Ref.t Model → AgdaInteraction.t → t → IO ⊤
+  send-command output-chan model-ref intr t = do
     OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
+    model-ref |> Ref.modify λ model → record model
+      { interaction-queue = model .interaction-queue |> Queue.enqueue intr }
     Ref.get (t .process) >>= Process.write (show intr) 
 
   private
@@ -99,41 +84,75 @@ module AgdaProcess where
     -- Once we have a response string, we can parse it into JSON and run one of the many
     -- response decoders and handler on it. These will update the model mutable variable,
     -- which is safe since this handler will be executed as a job in the `JobQueue.t`.
-    handle-response-string : OutputChannel.t → Ref.t Model → String → Ref.t Process.t → JobQueue.Job
-    handle-response-string output-chan model-ref response proc-ref = parse-json response |> λ where
-        -- TODO: We should probably log that Agda sent something we don't understand
-        nothing → pure tt
-        (just parsed-response) → do
-          model ← Ref.get model-ref
-          new-model ← handle-agda-message (λ intr → do
-            OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
-            Ref.get proc-ref >>= Process.write (show intr)) model-ref model parsed-response or-else pure model
-          Ref.set model-ref new-model
+    handle-immediate-response : OutputChannel.t → Ref.t Model → JSON → Ref.t Process.t → JobQueue.Job
+    handle-immediate-response output-chan model-ref parsed-response proc-ref = do
+      OutputChannel.trace ("Handling response: " <> show parsed-response) output-chan
+      model ← Ref.get model-ref
+      new-model ← handle-agda-message (λ intr → do
+        OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
+        Ref.get proc-ref >>= Process.write (show intr)) model-ref model parsed-response or-else pure model
+      Ref.set model-ref new-model
+
+    handle-interaction-result : OutputChannel.t → Ref.t Model → List JSON → Ref.t Process.t → JobQueue.Job
+    handle-interaction-result output-chan model-ref parsed-responses proc-ref =
+      tt <$ (parsed-responses |> mapM λ parsed-response →
+        handle-immediate-response output-chan model-ref parsed-response proc-ref)
 
     spawn-proc : OutputChannel.t → IO Process.t
     spawn-proc output-chan = do
       -- We reload the config every time spawn is called, so that when the user issues a reload agda command,
       -- the possibly updated configuration from the vscode settings is also applied.
       config ← Config.load
-      let args = "--interaction-json" ∷ filter (λ s → ∥ s ∥ > 0) (split (config .extra-args) " ")
+      let args = "--interaction-json" ∷ filter (λ s → ∥ s ∥ > 0) (NE.to-List $ split (config .extra-args) " ")
       let cmd-name = config .agda-path or-else "agda"
       OutputChannel.trace ("Spawning process: " ++ cmd-name ++ " " ++ intercalate " " args) output-chan
       Process.spawn cmd-name args
+
+    immediate-kind? : String → Bool
+    immediate-kind? s =
+      let kinds = "ClearHighlighting" ∷ "HighlightingInfo" ∷ "ClearRunningInfo" ∷ "RunningInfo" ∷ "Status" ∷ [] in
+      List.any (String._==_ s) kinds
 
     -- Whenever a buffer of data is received, we append to it to previously read and unparsed data.
     -- This complete buffer is split on newlines and the "JSON >" prompts are removed. All of the
     -- full lines should be JSON strings with responses, and jobs to parse and handle them will be pushed
     -- to the job queue.
     on-data-handler : Ref.t Process.t → JobQueue.t → Ref.t Model → OutputChannel.t → Ref.t String → Buffer.t → IO ⊤
-    on-data-handler proc-ref res-queue model-ref output-chan stdout-buffer buffer =
-      (List.unsnoc ∘ List.map strip-prompt ∘ lines ∘ (_++ Buffer.to-string buffer) <$> Ref.get stdout-buffer) >>= λ where
-        nothing → OutputChannel.error "Could not unsnoc response string" output-chan
-        (just (responses , new-buffer)) → do
-          Ref.set stdout-buffer new-buffer
-          tt <$ forM responses λ response → do
-            OutputChannel.trace ("Received response from Agda: " ++ response) output-chan
-            res-queue |> JobQueue.push (handle-response-string output-chan model-ref response proc-ref)
+    on-data-handler proc-ref res-queue model-ref output-chan stdout-buffer received-buffer = do
+      model ← Ref.get model-ref
+      let interaction-queue = model .interaction-queue
 
+      buffer ← (_++ Buffer.to-string received-buffer) <$> Ref.get stdout-buffer
+      let init-intrs , last-intr = split buffer "JSON> " |> NE.map lines |> NE.unsnoc
+
+      let last-intr , new-buffer = NE.unsnoc last-intr
+      Ref.set stdout-buffer new-buffer
+
+       -- TODO: We should probably log that Agda sent something we don't understand
+      let init-intr = List.map (List.map-Maybe parse-json ∘ NE.to-List) init-intrs
+      let lines-per-intr = NE.snoc init-intr (List.map-Maybe parse-json last-intr)
+            |> λ { (x :| xs) → (model .current-interaction <> x) :| xs }
+
+      let immediate-responses , (complete-intrs , incomplete-intr) = lines-per-intr
+            |> NE.map (List.partition (from-Maybe false ∘ fmap immediate-kind? ∘ required "kind" string))
+            |> NE.unzip
+            |> map-first (List.concat ∘ NE.to-List)
+            |> map-second NE.unsnoc
+
+      immediate-responses |> mapM λ immediate →
+        res-queue |> JobQueue.push (handle-immediate-response output-chan model-ref immediate proc-ref)
+
+      complete-intrs
+        |> List.zip interaction-queue
+        |> mapM λ (intr , intr-res) → do
+          OutputChannel.trace ("Completed interaction: " <> show intr) output-chan
+          res-queue |> JobQueue.push (handle-interaction-result output-chan model-ref intr-res proc-ref)
+
+      Ref.set model-ref record model
+        { interaction-queue = Queue.skip List.∥ complete-intrs ∥ interaction-queue
+        ; current-interaction = incomplete-intr
+        }
+            
     {-# TERMINATING #-}
     mutual
       -- A child process calls this handler when:

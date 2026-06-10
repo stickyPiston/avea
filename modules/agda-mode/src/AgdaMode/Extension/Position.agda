@@ -11,6 +11,7 @@ open import Data.String hiding (∥_∥ ; _==_)
 open import Data.Product
 import Data.String as String
 open import Data.List hiding (_++_) ; import Data.List as List
+open import Data.List.NonEmpty
 open import Data.Map
 open import Function
 open import Data.IO
@@ -60,11 +61,10 @@ module Change where
 
   from-TextDocumentContentChangeEvent : TextDocumentContentChangeEvent.t → t
   from-TextDocumentContentChangeEvent change =
-    let lines = String.split (change .text) "\n" in
+    let lines = String.lines (change .text) in
     lines |> λ where
-      [] → mkChange (change .range) (Range.start $ change .range)
-      [ line ] → mkChange (change .range) (Position.right String.∥ line ∥ $ Range.start (change .range))
-      (_ ∷ line ∷ lines) →
+      (line :| []) → mkChange (change .range) (Position.right String.∥ line ∥ $ Range.start (change .range))
+      (_ :| line ∷ lines) →
         let last-line = last lines or-else line in
         let start-pos = Range.start $ change .range in
         mkChange (change .range) (Position.new (Position.line start-pos + ∥ line ∷ lines ∥) String.∥ last-line ∥)

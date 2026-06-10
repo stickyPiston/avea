@@ -7,6 +7,7 @@ open import Data.IO
 import Data.IO as IO
 open import Data.List hiding (any ; head) renaming (_++_ to _++ˡ_)
 import Data.List as List
+open import Data.List.Queue
 open import Data.Maybe
 open import Data.Maybe.Effectful
 open import Data.Map
@@ -44,20 +45,20 @@ private variable
   A : Set a
 
 single-character-range? : Range.t → Bool
-single-character-range? r =
-  (Position.line $ Range.start r) Nat.== (Position.line $ Range.end r)
-  ∧ (1 + Position.char (Range.start r)) Nat.== (Position.char $ Range.end r)
+single-character-range? r = Position.equals? (Range.start r) (Position.left 1 $ Range.end r)
+  -- (Position.line $ Range.start r) Nat.== (Position.line $ Range.end r)
+  -- ∧ (1 + Position.char (Range.start r)) Nat.== (Position.char $ Range.end r)
 
 -- TODO: The order of the interaction point list does not matter, so we might as well cons the ips instead of
 -- inefficiently snoc'ing them.
 expand-interaction-point : List InteractionPoint.t × Nat → InteractionPoint.t → List InteractionPoint.t × Nat
 expand-interaction-point (ac , Δ) ip =
-  if single-character-range? (ip .range) then
+  if not (single-character-range? (ip .range)) then
     ac <> [ ip ] , Δ
-  else (
-    let shifted-range = Range.right Δ $ ip .range in
-    ac <> [ record ip { range = shifted-range } ] , Δ + 5 
-  )
+  else
+    let start-pos = Position.right Δ (Range.start $ ip .range) in
+    let end-pos = Position.right 6 start-pos in
+    ac <> [ record ip { range = Range.new start-pos end-pos } ] , Δ + 5 
 
 -- This function only merges 1-wide interaction points with old interactions points. It should not occur that
 -- interactions overlap in any other way.
@@ -97,11 +98,11 @@ handle-interaction-points model f = TextEditor.active-editor >>= maybe (pure mod
   -- the change event handler will not shift edits to goals that fall exactly onto goals according to the cache,
   -- while still shifting the tokens and goals that are not recently dug in the regular fashion.
   let expanded-ips = ips |> foldl ([] , 0) expand-interaction-point |> Σ.fst
-  let edits = ips |> map-Maybe λ ip → if single-character-range? (ip .range)
+  let vsc-edits = ips |> map-Maybe λ ip → if single-character-range? (ip .range)
         then just (Edit.replace (ip .range) "{!  !}")
         else nothing
 
-  TextEditor.edit edits e
+  TextEditor.edit vsc-edits e
   TextDocument.save doc
   doc ← TextEditor.document e
 
@@ -154,11 +155,11 @@ handle-give-action send-command model f = TextEditor.active-editor >>= maybe (pu
   let ip-range = give .interaction-point .range
       -- TODO: Change get-text to be IO
   let content = trim $ TextDocument.get-text (InteractionPoint.content-range (give .interaction-point)) doc
-  let edits = give .give-result |> λ where
-        parens → [ Edit.replace ip-range ("(" ++ content ++ ")") ]
-        no-parens → [ Edit.replace ip-range content ]
-        (str s) → [ Edit.replace ip-range s ]
-  TextEditor.edit edits e
+  let edit-string = give .give-result |> λ where
+        parens → "(" ++ content ++ ")"
+        no-parens → content
+        (str s) → s
+  TextEditor.edit [ Edit.replace ip-range edit-string ] e
   TextDocument.save doc
   model <$ send-command (iotcm doc AgdaCommand.load)
 

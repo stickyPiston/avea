@@ -30,7 +30,8 @@ last = foldr nothing (λ _ b → just b)
 foldl : B → (B → A → B) → List A → B
 foldl b f [] = b
 foldl b f (x ∷ xs) = foldl (f b x) f xs
-{-# COMPILE JS foldl = a => A => b => B => b => f => xs => xs.reduce((ac, e) => f(ac)(e), b) #-}
+{-# COMPILE JS foldl = a => A => b => B => b => f => xs =>
+  xs.reduce((ac, e) => f(ac)(e), b) #-}
 
 head : List A → Maybe A
 head [] = nothing
@@ -113,6 +114,12 @@ take-while p (x ∷ xs) = if p x then x ∷ take-while p xs else []
   return i === -1 ? xs : xs.slice(0, i);
 } #-}
 
+drop : ℕ → List A → List A
+drop zero xs = xs
+drop (suc n) [] = []
+drop (suc n) (x ∷ xs) = drop n xs
+{-# COMPILE JS drop = a => A => n => xs => xs.slice(Number(n)) #-}
+
 postulate drop-while : (A → Bool) → List A → List A
 {-# COMPILE JS drop-while = a => A => p => xs => {
   const i = xs.findIndex(x => !p(x));
@@ -151,7 +158,6 @@ unsnoc (x ∷ []) = just ([] , x)
 unsnoc (a ∷ as) = case unsnoc as of λ where
   (just (as , b)) → just (a ∷ as , b)
   nothing → nothing
-
 {-# COMPILE JS unsnoc = a => A => xs => {
   if (xs.length) {
     return x => x["just"]({ "_,_": y => y["_,_"](xs.slice(0, xs.length - 1), xs[xs.length - 1]) });
@@ -188,6 +194,19 @@ zip-with f (x ∷ xs) (y ∷ ys) = f x y ∷ zip-with f xs ys
   return res;
 } #-}
 
+zip : List A → List B → List (A × B)
+zip = zip-with _,_
+
+unzip : List (A × B) → List A × List B
+unzip [] = [] , []
+unzip ((a , b) ∷ ps) = let as , bs = unzip ps in (a ∷ as) , (b ∷ bs)
+{-# COMPILE JS unzip = a => A => b => B => ps => {
+  let ls = [], rs = [];
+  for (const p of ps)
+    p["_,_"]({ "_,_": (l, r) => { ls.push(l); rs.push(r) } });
+  return { "_,_": y => y["_,_"](ls, rs) };
+} #-}
+
 infix 5 _to_
 
 {-# TERMINATING #-}
@@ -214,13 +233,8 @@ Maybe-to-List (just x) = [ x ]
 map-Maybe : (A → Maybe B) → List A → List B
 map-Maybe f = concat-map λ a → Maybe-to-List (f a)
 
-module NonEmpty where
-  data t (A : Set) : Set where
-    _:|_ : A → List A → t A
-
-  to-List : t A → List A
-  to-List (a :| as) = a ∷ as
-open NonEmpty using (_:|_) public
+justs : List (Maybe A) → List A
+justs = map-Maybe id
 
 open import Effect.Applicative
 

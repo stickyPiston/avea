@@ -158,6 +158,40 @@ Below we will describe how the "load file" command is handled as an example of h
 
 There is one component of the extension that operates completely separately from the compiler: the input mode. The extension listens for Visual Studio Code's `type` event, which is fired on every character that should be displayed in the editor. If the character is `\`, then input mode is enabled, and any subsequent characters are captured and move the focus in a trie zipper that contains all of the replacements. If the code matches a value in the trie, then it is replaced in the editor, until the user types something that is not matched by the trie, which exits the input mode.
 
+== Communicating with Agda
+
+Once the extension is activated, the extension spawns Agda's interaction mode as a subprocess. The subprocess allows the extension to send messages to Agda via the subprocess's standard input pipe. Agda accepts a set of interactions encoded as Haskell expressions. These expressions are internally parsed by the `read` function within the Agda compiler, and then processed.
+
+#grid(columns: (50%, 50%), gutter: 16pt)[
+Interactions contain an absolute path to the Agda file that the interaction should operate on. `NonInteractive` and `Direct` describe how Agda should respond to the extension. This combination means that Agda will output all responses on the standard output pipe, whereas `Indirect` means that Agda will write its responses to temporary files on the disk.
+][
+#align(horizon)[
+```hs
+IOTCM
+  "/Users/.../file.agda"
+  NonInteractive Direct
+  (Cmd_load "/Users/.../file.agda" [])
+```
+]
+]
+
+The last part of the interaction is the command. The command is defined as an abstract data type with many constructors. Each of them defines an action that an extension user can perform, for example, load a file, refine a goal, or search about the module.
+
+Once an interaction is sent to Agda, it will respond. The extension also uses the subprocess to receive those responses. A subprocess can have a handler that receives any output from the process that is sent on the standard output pipe. The handler receives buffers of the output, which typically consist of (parts of) JSON encoded responses. The extension makes sure that once a full message is received, it is parsed and handled.
+
+=== Synchronising effects
+
+
+
+- Serialisation of agda interactions
+- Receiving and handling responses
+- ProcessQueue
+- Synchronisation
+
+== Syntax highlighting and Token information
+
+== Goal handling
+
 == Importing Javascript libraries <libraries>
 
 The extension uses some external libraries that need to be imported in the Javascript output, in order to function. Usually in Javascript, the `import` statement is used to import libraries. However, the latest release of the Agda compiler does not provide a way to import Javascript libraries. Instead the extension relies on a separate Javascript file to set the dependencies in a global variable available across all modules, and then call the extension's main function, as shown in @entry-js.
@@ -233,6 +267,12 @@ However, in order to avoid stack overflows when, for example, traversing large l
     ```
   ]
 ]<bind>
+
+=== Limiting asynchronicity
+
+When communicating with the Agda subprocess, each response buffer is passed to a callback function that is registered as the response buffer handler. This callback spawns many new invocations of side-effectful functions, and each of these invocations does side-effects in the `IO` monad. As mentioned before, this monad encapsulates both synchronous and asynchronous side effects. This means that concurrency issues might occur.
+
+The extension therefore includes a response queue, which allows it to process responses one at the time. This means that no concurrency issues may occur, and the handlers can use asynchronous IO operations without worry. The drawback is that this approach refrains the extension from using multithreading. In practice however, the performance does not seem as much of a bottleneck 
 
 == Passing messages to the webview safely <webview-messages>
 
@@ -430,7 +470,7 @@ We can evaluate this API by implementing a number of small new features that do 
 
 == Unifying architecture for all Agda extensions <unifying-arch>
 
-Looking at the implementations of existing Agda extensions, a lot of the infrastructure for handling user commands, and responses from the Agda process are quite similar (up to differences in programming languages). This "core" part of every extension can be extracted and generalised such that the editor interactions are abstract. With a working Visual Studio Code extension, we could try adding support for another IDE -- for example Atom#footnote[#link("https://flight-manual.atom-editor.cc/hacking-atom/")], whose packages also need to be written in Javascript -- to create an abstraction layer between the editor-specific implementations and the editor-agnostic Agda interfacing code. Additionally, if the "core" logic is designed in such a way that it can be compiled to both Haskell and Javascript, we could also add support for Neovim using the same library as Cornelis uses.
+
 
 == Improving the foreign function interface <improving-ffi>
 
@@ -470,6 +510,33 @@ As mentioned earlier, existing Agda extensions all have custom logic for interfa
 - For his Master's thesis, Stuijt Giacaman implemented agda-lsp -- a language server designed that aims to provide provide real-time feedback to the users @agda-lsp. Agda-lsp achieves this through the use of a custom scope-checker for Agda, and avoiding the use of the type-checker, which can be slow for bigger source files. The scope-checker provides sufficient information to provide basic LSP functionality such as semantic highlighting and go-to-definition, but also functionality currently not found in any Agda extensions making use of the interaction mode: finding references of a given symbol, and diagnostics for unused symbols.
 
 Even though there is plenty of future work that these projects suggest, it would be difficult to relate that work to the our non-LSP implementation for an Agda extension. We therefore deem this research direction out of scope for this thesis.
+
+= Future Work
+
+== Additions to the Avea architecture
+
+=== Agda interaction DSL
+
+=== Making the extension editor-agnostic
+
+Looking at the implementations of existing Agda extensions, a lot of the infrastructure for handling user commands, and responses from the Agda process are quite similar (up to differences in programming languages). This "core" part of every extension can be extracted and generalised such that the editor interactions are abstract. With a working Visual Studio Code extension, we could try adding support for another IDE -- for example Atom#footnote[#link("https://flight-manual.atom-editor.cc/hacking-atom/")], whose packages also need to be written in Javascript -- to create an abstraction layer between the editor-specific implementations and the editor-agnostic Agda interfacing code. Additionally, if the "core" logic is designed in such a way that it can be compiled to both Haskell and Javascript, we could also add support for Neovim using the same library as Cornelis uses.
+
+There are multiple way to design an editor-agnostic extension:
+
+#grid(columns: (50%, 50%), gutter: 16pt)[
+We can implement a WebAssembly target to Agda's compilation stage. WebAssembly can be embedded in many different languages and runtimes, and therefore is an interesting target for the extension. For Visual Studio Code, we can use Node.JS's API for interfacing with WebAssembly. The architecture is described as a diagram in @wasm.
+
+The downside to this is that the interfacing to the editor must be done outside of Agda. That is, the Foreign Function Interface that is currently implemented in Avea using compiler pragmas, should partly be moved to the host language.
+
+Another option is to rework the extension to function as a language server. This means that it runs as a standalone program, which an editor-specific extension can spawn. The editor-specific extension only needs to implement the communication layer between the language server and the editor. The protocol used to communicate can be a custom protocol for Avea, or the custom extensions to LSP that Lean4 or Rocq have implemented could be implemented for Avea, as far as they make sense for Agda style interactions.
+][
+  #align(horizon)[
+#figure(image("wasm.png", width: 80%), caption: [Hello world])<wasm>
+#figure(image("language-server.png", width: 80%), caption: [Hello world])<language-server>
+  ]
+]
+
+== Additions to the Agda compiler
 
 #pagebreak()
 

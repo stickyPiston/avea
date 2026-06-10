@@ -8,6 +8,8 @@ open import Data.Bool
 open import Data.List
 open import Data.Maybe
 open import Data.Product
+open import Data.List.NonEmpty
+open import Data.JSON
 
 open import Class.Monoid
 
@@ -59,3 +61,15 @@ private
 instance
   Show-× : {{ Show A }} → {{ Show B }} → Show (A × B)
   Show-× = record { show = show-× }
+
+instance
+  Show-NonEmpty : {{ Show A }} → Show (NE.t A)
+  Show-NonEmpty = record { show = λ (hd :| tl) → show hd <> " :| " <> show tl }
+
+private
+  postulate show-JSON : JSON → String
+  {-# COMPILE JS show-JSON = JSON.stringify #-}
+
+instance
+  Show-JSON : Show JSON
+  Show-JSON = record { show = show-JSON }

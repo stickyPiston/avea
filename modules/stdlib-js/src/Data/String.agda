@@ -14,6 +14,7 @@ _++_ : String → String → String
 _++_ = primStringAppend
 
 open import Data.List using (List)
+open import Data.List.NonEmpty
 open import Agda.Builtin.Nat
 
 postulate _starts-with_ : String → String → Bool
@@ -24,9 +25,6 @@ postulate slice : Nat → Nat → String → String
 
 postulate ∥_∥ : String → Nat
 {-# COMPILE JS ∥_∥ = s => BigInt(s.length) #-}
-
-postulate lines : String → List String
-{-# COMPILE JS lines = xs => xs.split("\n") #-}
 
 postulate unlines : List String → String
 {-# COMPILE JS unlines = xs => xs.join("\n") #-}
@@ -40,8 +38,14 @@ postulate _=~_ : String → String → Bool
 postulate replace : String → String → String → String
 {-# COMPILE JS replace = r => w => s => s.replaceAll(new RegExp(r, "g"), w) #-}
 
-postulate split : String → String → List String
-{-# COMPILE JS split = s => b => s.split(b) #-}
+postulate split : String → String → NE.t String
+{-# COMPILE JS split = s => b => {
+  const [hd, ...tl] = s.split(b);
+  return { "_:|_": y => y["_:|_"](hd, tl) };
+} #-}
+
+lines : String → NE.t String
+lines s = split s "\n"
 
 postulate trim : String → String
 {-# COMPILE JS trim = s => s.trim() #-}

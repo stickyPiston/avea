@@ -1,6 +1,6 @@
 module Data.Map where
 
-open import Data.String
+open import Agda.Builtin.String
 open import Data.Maybe
 open import Data.Maybe.Effectful
 open import Data.List using (List ; foldr ; map)

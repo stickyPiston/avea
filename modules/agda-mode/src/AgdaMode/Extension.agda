@@ -86,6 +86,8 @@ init keymap = do
     ; underline-decoration = dec₁
     ; ip-decoration = dec₂
     ; keymap = keymap
+    ; interaction-queue = []
+    ; current-interaction = []
     }
 
 goal-context-cmds : StringMap.t (Rewrite.t → InteractionPoint.t → AgdaCommand.t)
@@ -195,30 +197,28 @@ activate = try λ _ → do
 
   register-command "agda-mode.restart" $ AgdaProcess.restart output-chan model-ref agda
 
-  -- TODO: Register command handlers
-  -- TODO: Register disposables
   register-command "agda-mode.load-file" $ do
     just intr ← AgdaInteraction.from-AgdaCommand AgdaCommand.load where _ → pure tt
     TextDocument.save (intr .file)
-    AgdaProcess.send-command output-chan intr agda
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   forM (StringMap.entries goal-context-cmds) λ (name , cmd) →
     register-command-with-args name λ o → do
       model ← IO.Ref.get model-ref
       just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
-      just intr ← AgdaInteraction.under-cursor-command model (cmd r) where _ → pure tt
-      AgdaProcess.send-command output-chan intr agda
+      just intr ← under-cursor-command model (cmd r) where _ → pure tt
+      AgdaProcess.send-command output-chan model-ref intr agda
 
   forM (StringMap.entries goal-give-cmds) λ (name , cmd) →
     register-command-with-args name λ o → do
       model ← IO.Ref.get model-ref
-      just intr ← AgdaInteraction.under-cursor-command model (cmd (get-pmLambda o)) where _ → pure tt
-      AgdaProcess.send-command output-chan intr agda
+      just intr ← under-cursor-command model (cmd (get-pmLambda o)) where _ → pure tt
+      AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command "agda-mode.make-case" $ do
     model ← IO.Ref.get model-ref
-    just intr ← AgdaInteraction.under-cursor-command model AgdaCommand.make-case where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+    just intr ← under-cursor-command model AgdaCommand.make-case where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command "agda-mode.next-goal" $ do
     model ← IO.Ref.get model-ref
@@ -232,54 +232,54 @@ activate = try λ _ → do
     register-command-with-args name λ o → do
       just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
       just intr ← AgdaInteraction.from-AgdaCommand (cmd r) where _ → pure tt
-      AgdaProcess.send-command output-chan intr agda
+      AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command "agda-mode.compile-file" $ do
     just backend ← backends !?_ <$> Window.quick-pick (StringMap.keys backends) where _ → pure tt
     just intr ← AgdaInteraction.from-AgdaCommand (AgdaCommand.compile-file backend) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command-with-args "agda-mode.compute" λ o → do
     model ← IO.Ref.get model-ref
     just mode ← pure $ ComputeMode.decoder =<< (just (j-string $ get-compute-mode-string o)) where _ → pure tt
-    just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.compute-goal mode) >>= λ where
+    just intr ← (under-cursor-command model (AgdaCommand.compute-goal mode) >>= λ where
       (just intr) → pure (just intr)
-      nothing → AgdaInteraction.input-prompt-command (AgdaCommand.compute-toplevel mode)) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+      nothing → input-prompt-command (AgdaCommand.compute-toplevel mode)) where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command-with-args "agda-mode.module-contents" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
-    just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.module-contents-goal r) >>= λ where
+    just intr ← (under-cursor-command model (AgdaCommand.module-contents-goal r) >>= λ where
       (just intr) → pure (just intr)
-      nothing → AgdaInteraction.input-prompt-command (AgdaCommand.module-contents-toplevel r)) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+      nothing → input-prompt-command (AgdaCommand.module-contents-toplevel r)) where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command "agda-mode.why-in-scope" $ do
     model ← IO.Ref.get model-ref
-    just intr ← (AgdaInteraction.under-cursor-command model AgdaCommand.why-in-scope-goal >>= λ where
+    just intr ← (under-cursor-command model AgdaCommand.why-in-scope-goal >>= λ where
       (just intr) → pure (just intr)
-      nothing → AgdaInteraction.input-prompt-command AgdaCommand.why-in-scope-toplevel) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+      nothing → input-prompt-command AgdaCommand.why-in-scope-toplevel) where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   forM (StringMap.entries toggle-cmds) λ (name , cmd) →
     register-command name $ do
       just intr ← AgdaInteraction.from-AgdaCommand cmd where _ → pure tt
-      AgdaProcess.send-command output-chan intr agda
+      AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command-with-args "agda-mode.search-about" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
-    just intr ← AgdaInteraction.input-prompt-command (AgdaCommand.search-about-toplevel r) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+    just intr ← input-prompt-command (AgdaCommand.search-about-toplevel r) where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   register-command-with-args "agda-mode.infer" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
-    just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.infer r) >>= λ where
+    just intr ← (under-cursor-command model (AgdaCommand.infer r) >>= λ where
       (just intr) → pure (just intr)
-      nothing → AgdaInteraction.input-prompt-command (AgdaCommand.infer-toplevel r)) where _ → pure tt
-    AgdaProcess.send-command output-chan intr agda
+      nothing → input-prompt-command (AgdaCommand.infer-toplevel r)) where _ → pure tt
+    AgdaProcess.send-command output-chan model-ref intr agda
 
   model ← IO.Ref.get model-ref
   stp ← SemanticTokensProvider.new

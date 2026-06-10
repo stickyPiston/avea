@@ -20,3 +20,9 @@ record Functor (F : Set ℓ₁ → Set ℓ₂) : Set (lsuc (ℓ₁ ⊔ ℓ₂)) 
 
   _<&>_ : F A → (A → B) → F B
   _<&>_ = flip _<$>_
+
+open import Data.Product
+
+instance
+  Functor-× : {A : Set} → Functor {lzero} (A ×_)
+  Functor-× = record { fmap = λ f (a , b) → a , f b }

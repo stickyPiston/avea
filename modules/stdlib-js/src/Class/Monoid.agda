@@ -3,7 +3,7 @@ module Class.Monoid where
 open import Level
 open import Data.List
 open import Data.Maybe
-open import Data.String
+open import Agda.Builtin.String
 open import Data.Map
 
 private variable

@@ -12,7 +12,7 @@
     "Programming Languages"
   ],
   "repository": "github:stickyPiston/agda-mode-vscode",
-  "main": "./bundle.js",
+  "main": "./out/extension.js",
   "contributes": {
     "configuration": {
       "title": "",
