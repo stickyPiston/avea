@@ -9,6 +9,7 @@ open import Function
 open import Data.Maybe
 open import Data.Product
 open import Data.Bool
+open import Data.Either
 
 private variable
   a b c : Level
@@ -235,6 +236,11 @@ map-Maybe f = concat-map λ a → Maybe-to-List (f a)
 
 justs : List (Maybe A) → List A
 justs = map-Maybe id
+
+partition-Either : List (Either A B) → List A × List B
+partition-Either = foldl ([] , []) λ where
+  (ls , rs) (left l) → (ls ++ [ l ]) , rs
+  (ls , rs) (right r) → ls , (rs ++ [ r ])
 
 open import Effect.Applicative
 

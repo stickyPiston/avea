@@ -16,6 +16,7 @@ open import Data.Nat
 open import Data.Map
 open import Data.JSON.Decode
 open import Data.String as String
+open import Data.Either
 
 open import AgdaMode.Extension.Model
 open import AgdaMode.Extension.Response
@@ -77,8 +78,8 @@ module AgdaProcess where
   -- message causing the interaction queue to fall behind on the actually sent interactions.
   send-command : OutputChannel.t → Ref.t Model → AgdaInteraction.t → t → IO ⊤
   send-command output-chan model-ref intr t = do
-    OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
     t .send-queue |> JobQueue.push (do
+      OutputChannel.trace ("Sending interaction to Agda: " ++ String.trim (show intr)) output-chan
       model-ref |> Ref.modify λ model → record model
         { interaction-queue = model .interaction-queue |> Queue.enqueue intr }
       Ref.get (t .process) >>= Process.write (show intr))
@@ -99,7 +100,7 @@ module AgdaProcess where
       OutputChannel.trace ("Handling response: " <> show parsed-response) output-chan
       model ← Ref.get model-ref
       new-model ← handle-agda-message (λ intr → do
-        OutputChannel.trace ("Sending interaction to Agda: " ++ show intr) output-chan
+        OutputChannel.trace ("Sending interaction to Agda: " ++ String.trim (show intr)) output-chan
         Ref.get proc-ref >>= Process.write (show intr)) model-ref model parsed-response or-else pure model
       Ref.set model-ref new-model
 
@@ -123,6 +124,15 @@ module AgdaProcess where
       let kinds = "ClearHighlighting" ∷ "HighlightingInfo" ∷ "ClearRunningInfo" ∷ "RunningInfo" ∷ "Status" ∷ [] in
       List.any (String._==_ s) kinds
 
+    parse-json-Either : String → Either String JSON
+    parse-json-Either input = parse-json input |> λ where
+      nothing → left ("JSON parse error: " <> input)
+      (just json) → right json
+
+    empty-string? : String → Bool
+    empty-string? "" = true
+    empty-string? _ = false
+
     -- Whenever a buffer of data is received, we append to it to previously read and unparsed data.
     -- This complete buffer is split on newlines and the "JSON >" prompts are removed. All of the
     -- full lines should be JSON strings with responses, and jobs to parse and handle them will be pushed
@@ -138,8 +148,11 @@ module AgdaProcess where
       let last-intr , new-buffer = NE.unsnoc last-intr
       Ref.set stdout-buffer new-buffer
 
-       -- TODO: We should probably log that Agda sent something we don't understand
-      let init-intr = List.map (List.map-Maybe parse-json ∘ NE.to-List) init-intrs
+      -- Parse all responses to JSON, while collecting all JSON parse errors to send them to the output channel
+      let errors , init-intr = init-intrs
+            |> List.map (List.partition-Either ∘ List.map parse-json-Either ∘ List.filter (not ∘ empty-string?) ∘ NE.to-List)
+            |> List.unzip
+      errors |> List.concat |> mapM λ error → OutputChannel.error error output-chan
       let lines-per-intr = NE.snoc init-intr (List.map-Maybe parse-json last-intr)
             |> λ { (x :| xs) → (model .current-interaction <> x) :| xs }
 
