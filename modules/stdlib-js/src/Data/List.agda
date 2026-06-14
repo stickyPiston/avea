@@ -141,6 +141,10 @@ postulate sort-Ord' : (A → A → Int) → List A → List A
 sort-Ord : {{ Ord A }} → List A → List A
 sort-Ord xs = sort-Ord' (Ordering.to-Int ∘₂ compare) xs
 
+uncons : List A → Maybe (A × List A)
+uncons [] = nothing
+uncons (x ∷ xs) = just (x , xs)
+
 snoc : A → List A → List A
 snoc x xs = xs ++ [ x ]
 {-# COMPILE JS snoc = a => A => x => xs => [...xs, x] #-}

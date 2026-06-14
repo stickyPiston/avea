@@ -165,6 +165,9 @@ handle-ips-change doc ips change = ips |> map-Maybe λ ip@(mkInteractionPoint id
     end-marker ← InteractionPoint.end-marker ip |> handle-offset-change change
     pure $ mkInteractionPoint id (start-marker Range.∪ end-marker)
 
+private postulate trace : {A : Set} → A → IO ⊤
+{-# COMPILE JS trace = A => a => async () => { console.log(a); return b => b["tt"]() } #-}
+
 register-change-handler : AgdaProcess.t → Ref.t Model → IO ⊤
 register-change-handler agda model-ref =
   Workspace.on-did-change-text-document λ e → e .content-changes |> λ where
@@ -181,21 +184,25 @@ register-change-handler agda model-ref =
                 |> map Change.from-TextDocumentContentChangeEvent
                 |> sort-Ord
                 |> shift-changes
+
+          -- trace "----------------------------"
+          -- trace (show changes)
+          -- trace ips
           
           let new-tokens = changes |> foldl tokens handle-tokens-change
 
           -- If one of the changes involved the insertion of a newly dug goal, then we need to do some extra work,
           -- Otherwise, we take a shortcut to keep the processing time on each edit minimal.
-          let new-ips =
-                if List.any (λ change → change .text String.== "{!  !}") (e .content-changes) then (
-                  -- We partition the list of interaction points into
-                  -- * a list of ips that have been dug in these changes, i.e. changes that fall exactly over an
-                  --   interaction point in the cache;
-                  -- * a list of ips that need to be shifted as regular.
-                  let exactly-on-change? ip = List.any (Range.equals? (ip .range) ∘ Change.replacement-range doc) changes in
-                  let newly-dug-ips , old-ips = partition exactly-on-change? ips in
-                  changes |> foldl old-ips (handle-ips-change doc) |> append newly-dug-ips
-                ) else (changes |> foldl ips (handle-ips-change doc))
+          let new-ips = changes |> foldl ips (handle-ips-change doc)
+          --       if List.any (λ change → change .text String.== "{!  !}") (e .content-changes) then (
+          --         -- We partition the list of interaction points into
+          --         -- * a list of ips that have been dug in these changes, i.e. changes that fall exactly over an
+          --         --   interaction point in the cache;
+          --         -- * a list of ips that need to be shifted as regular.
+          --         let exactly-on-change? ip = List.any (Range.equals? (ip .range) ∘ Change.replacement-range doc) changes in
+          --         let newly-dug-ips , old-ips = partition exactly-on-change? ips in
+          --         changes |> foldl old-ips (handle-ips-change doc) |> append newly-dug-ips
+          --       ) else (changes |> foldl ips (handle-ips-change doc))
 
           Ref.set model-ref record model
             { loaded-files = model .loaded-files [ TextDocument.file-name doc ]:= mkFile new-ips new-tokens }

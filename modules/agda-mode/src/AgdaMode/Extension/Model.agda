@@ -42,8 +42,8 @@ module InteractionPoint where
       range : Range.t
   open t public
 
-  content-range : t → Range.t
-  content-range (mkInteractionPoint _ range) = -- offset-range (range .start + 2) (range .length - 4)
+  content-range : Range.t → Range.t
+  content-range range = -- offset-range (range .start + 2) (range .length - 4)
     Range.new (Position.right 2 $ Range.start range) (Position.left 2 $ Range.end range)
 
   equals? : t → t → Bool
@@ -208,7 +208,7 @@ module AgdaCommand where
 
   show-goal-command : TextDocument.t → InteractionPoint.t → List String
   show-goal-command doc ip = 
-    let goal-content = doc |> TextDocument.get-text (InteractionPoint.content-range ip) in
+    let goal-content = doc |> TextDocument.get-text (InteractionPoint.content-range (ip .range)) in
     let sanitised-goal-content = replace "\"" "\\\"" goal-content in
 
     -- We send along an up-to-date version of the interaction point's range.

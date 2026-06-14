@@ -43,6 +43,9 @@ postulate replace : String → String → String → String
 postulate split : String → String → List String
 {-# COMPILE JS split = s => b => s.split(b) #-}
 
+postulate split-regex : String → String → List String
+{-# COMPILE JS split-regex = s => b => s.split(new RegExp(b)) #-}
+
 postulate trim : String → String
 {-# COMPILE JS trim = s => s.trim() #-}
 

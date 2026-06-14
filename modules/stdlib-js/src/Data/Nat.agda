@@ -15,3 +15,6 @@ a mod b = a - ⌊ a / b ⌋ * b
 
 _quot-rem_ : ℕ → ℕ → ℕ × ℕ
 a quot-rem b = ⌊ a / b ⌋ , a mod b
+
+even? : Nat → Bool
+even? n = n mod 2 == 0

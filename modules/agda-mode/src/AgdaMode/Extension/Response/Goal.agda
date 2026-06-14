@@ -1,6 +1,5 @@
 module AgdaMode.Extension.Response.Goal where
 
-open import Data.String
 open import Data.Nat hiding (_==_) ; import Data.Nat as Nat
 open import Data.Int hiding (pos ; _+_)
 open import Data.IO
@@ -11,7 +10,8 @@ open import Data.Maybe
 open import Data.Maybe.Effectful
 open import Data.Map
 open import Data.Bool
-open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ)
+open import Data.String renaming (∥_∥ to ∥_∥ˢ ; slice to sliceˢ) hiding (_==_)
+import Data.String as String
 open import Data.JSON
 open import Data.Product
 open import Data.JSON.Decode
@@ -52,7 +52,7 @@ single-character-range? r =
 -- inefficiently snoc'ing them.
 expand-interaction-point : List InteractionPoint.t × Nat → InteractionPoint.t → List InteractionPoint.t × Nat
 expand-interaction-point (ac , Δ) ip =
-  if single-character-range? (ip .range) then
+  if not (single-character-range? (ip .range)) then
     ac <> [ ip ] , Δ
   else (
     let shifted-range = Range.right Δ $ ip .range in
@@ -147,17 +147,82 @@ give-action-decoder = do
   ip-factory ← required "interactionPoint" InteractionPoint.decoder
   pure λ doc → mkGiveAction gr (ip-factory doc)
 
+t' : Position.t → Position.t
+t' p = Position.new (Position.line p + 1) (Position.char p + 1)
+
+module ExpandState where
+  data State : Set where
+    in-string in-comment none : State
+
+  _==_ : State → State → Bool
+  in-string == in-string = true
+  in-comment == in-comment = true
+  none == none = true
+  _ == _ = false
+
+  _≠_ : State → State → Bool
+  a ≠ b = not (a == b)
+
+  record t : Set where
+    constructor es
+    field
+      result : String
+      state : State
+  open t public
+open ExpandState using (es ; result ; state ; State)
+
+-- Split on:
+-- 1. /(?<=[\s\)\}\"])--/gm, and pick the first part. The rest will be comments anyway.
+-- 2. /\\*"/gm and /{-|-}/gm, then do a scan with the following algorithm
+--   a. match with " and an uneven number of \ toggles string if not in comment
+--   b. match with {- enables comment if not in string
+--   c. match with -} disables comment if not in string
+--   d. ? is expanded if not in string or in comment
+
+single-line-comment-regex string-regex comment-start-regex comment-end-regex question-mark-regex parts-regex : String
+single-line-comment-regex = "((?<=[\\s\\)\\}\"])--)"
+string-regex = "\\*\""
+comment-start-regex = "{-"
+comment-end-regex = "-}"
+question-mark-regex = "(?<=[\\s\\)\\}\"])\\?"
+parts-regex =
+  let regexes = string-regex ∷ comment-start-regex ∷ comment-end-regex ∷ question-mark-regex ∷ [] in
+  "(" <> intercalate "|" regexes <> ")"
+
+expand-?s : String → String
+expand-?s input =
+  let non-comment , other = List.uncons (split-regex input single-line-comment-regex) or-else ("" , []) in
+  split-regex non-comment parts-regex
+  |> foldl (es "" State.none) (λ expand-state part →
+    let semi-result = record expand-state { result = expand-state .result <> part } in
+    if part =~ string-regex ∧ (expand-state .state ExpandState.≠ State.in-comment) ∧ even? ∥ part ∥ˢ then
+      record semi-result { state =
+        if expand-state .state ExpandState.== State.none then State.in-string else State.none }
+    else if part =~ comment-start-regex ∧ (expand-state .state ExpandState.≠ State.in-string) then
+      record semi-result { state = State.in-comment }
+    else if part =~ comment-end-regex ∧ (expand-state .state ExpandState.== State.in-comment) then
+      record semi-result { state = State.none }
+    else if part =~ question-mark-regex ∧ (expand-state .state ExpandState.== State.none) then
+      record expand-state { result = expand-state .result <> "{!  !}" }
+    else semi-result)
+  |> result
+  |> _<> join other
+
 handle-give-action : (AgdaInteraction.t → IO ⊤) → Model → (TextDocument.t → GiveAction) → IO Model
 handle-give-action send-command model f = TextEditor.active-editor >>= maybe (pure model) λ e → do
   doc ← TextEditor.document e
   let give = f doc
   let ip-range = give .interaction-point .range
+  let ip-range = Range.new (t' $ Range.start ip-range) (t' $ Range.end ip-range)
       -- TODO: Change get-text to be IO
-  let content = trim $ TextDocument.get-text (InteractionPoint.content-range (give .interaction-point)) doc
+  let content = TextDocument.get-text (InteractionPoint.content-range ip-range) doc
+        |> trim
+        |> expand-?s
+  
   let edits = give .give-result |> λ where
         parens → [ Edit.replace ip-range ("(" ++ content ++ ")") ]
         no-parens → [ Edit.replace ip-range content ]
-        (str s) → [ Edit.replace ip-range s ]
+        (str s) → [ Edit.replace ip-range (s |> expand-?s) ]
   TextEditor.edit edits e
   TextDocument.save doc
   model <$ send-command (iotcm doc AgdaCommand.load)
