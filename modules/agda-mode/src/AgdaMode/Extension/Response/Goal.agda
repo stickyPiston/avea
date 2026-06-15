@@ -55,7 +55,7 @@ expand-interaction-point (ac , Δ) ip =
   if not (single-character-range? (ip .range)) then
     ac <> [ ip ] , Δ
   else (
-    let shifted-range = Range.right Δ $ ip .range in
+    let shifted-range = Range.new (Position.right Δ (Range.start $ ip .range)) (Position.right (Δ + 6) (Range.start $ ip .range)) in
     ac <> [ record ip { range = shifted-range } ] , Δ + 5 
   )
 
@@ -180,11 +180,11 @@ open ExpandState using (es ; result ; state ; State)
 --   d. ? is expanded if not in string or in comment
 
 single-line-comment-regex string-regex comment-start-regex comment-end-regex question-mark-regex parts-regex : String
-single-line-comment-regex = "((?<=[\\s\\)\\}\"])--)"
+single-line-comment-regex = "((?<=[\\s\\)\\}\"])--|^--)"
 string-regex = "\\*\""
 comment-start-regex = "{-"
 comment-end-regex = "-}"
-question-mark-regex = "(?<=[\\s\\)\\}\"])\\?"
+question-mark-regex = "(?<=[\\s\\)\\}\"])\\?|^\\?"
 parts-regex =
   let regexes = string-regex ∷ comment-start-regex ∷ comment-end-regex ∷ question-mark-regex ∷ [] in
   "(" <> intercalate "|" regexes <> ")"

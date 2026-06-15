@@ -35,8 +35,8 @@ module Change where
       end-pos : Position.t
   open t public
 
-  replacement-range : TextDocument.t → t → Range.t
-  replacement-range doc change =
+  replacement-range : t → Range.t
+  replacement-range change =
     Range.new (Range.start $ change .source-range) (change .end-pos)
 
   -- TODO: Because min and max each form a Semigroup for any Set A, Changes with combine also forms a Semigroup. 
@@ -158,7 +158,7 @@ handle-tokens-change tokens change =
 
 handle-ips-change : TextDocument.t → List InteractionPoint.t → Change.t → List InteractionPoint.t
 handle-ips-change doc ips change = ips |> map-Maybe λ ip@(mkInteractionPoint id ip-range) →
-  if Range.equals? (Change.replacement-range doc change) ip-range then
+  if Range.equals? (Change.replacement-range change) ip-range then
     pure ip
   else do
     start-marker ← InteractionPoint.start-marker ip |> handle-offset-change change
@@ -185,9 +185,9 @@ register-change-handler agda model-ref =
                 |> sort-Ord
                 |> shift-changes
 
-          -- trace "----------------------------"
-          -- trace (show changes)
-          -- trace ips
+          trace "----------------------------"
+          trace (show changes)
+          trace (show ips)
           
           let new-tokens = changes |> foldl tokens handle-tokens-change
 
