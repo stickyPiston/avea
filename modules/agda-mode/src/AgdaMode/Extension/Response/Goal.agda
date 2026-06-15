@@ -278,21 +278,29 @@ handle-make-case send-command model f = do
   -- f =         | f =
   --   {!  !}    |   f x = ?
   -- ```         | ```
-  let pos = Range.start (ip .range)
+  let ip-range = Range.new (t' $ Range.start (ip .range)) (t' $ Range.end (ip .range))
+  let pos = Range.start ip-range
   let line = TextDocument.line-at doc (Position.line pos)
   
   -- Save the indentation of the line we are replacing, so that we can restore it later.
   let indentation = primStringFromList $ take-while primIsSpace (primStringToList $ TextLine.text line)
 
-  TextEditor.edit [ Edit.replace (TextLine.range line) (intercalate "\n" $ map (indentation ++_) clauses) ] e 
+  let expansion-index , replacement = clauses
+        |> map (indentation ++_)
+        |> intercalate "\n"
+        |> expand-?s
+
+  TextEditor.edit [ Edit.replace (TextLine.range line) replacement ] e 
   TextDocument.save doc
   
-  -- We need to issue a reload because Agda sends interaction points that, for some reason,
-  -- have already been expanded by the compiler. This means that the interaction points message
-  -- that follows the make case message, will not expand the question marks that we have inserted
-  -- here, since Agda sends 6-wide ranges instead of 1-wide at the places the questions marks are
-  -- located.
-  --
-  -- NOTE: Fixing this would require the compiler to not expand the question marks. This would
-  -- be more consistent with the interaction points messages that refine sends too.
+  expansion-index |> λ where
+    (just idx) → do
+      doc ← TextEditor.document e
+      let offset = TextDocument.offset-at doc (Position.new (Position.line pos) 0) + idx + 3
+      let pos = TextDocument.position-at doc offset
+      TextEditor.set-selections [ Selection.new pos pos ] e
+    nothing → pure tt
+  
+  -- We need to issue a reload, because Agda sends the old interaction point alongside this message.
+  -- Even though, we need the interaction points message for the newly inserted interaction points.
   model <$ send-command (iotcm doc AgdaCommand.load)

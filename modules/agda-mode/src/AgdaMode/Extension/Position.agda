@@ -185,9 +185,9 @@ register-change-handler agda model-ref =
                 |> sort-Ord
                 |> shift-changes
 
-          trace "----------------------------"
-          trace (show changes)
-          trace (show ips)
+          -- trace "----------------------------"
+          -- trace (show changes)
+          -- trace (show ips)
           
           let new-tokens = changes |> foldl tokens handle-tokens-change
 

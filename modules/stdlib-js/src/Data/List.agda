@@ -192,6 +192,9 @@ zip-with f (x ∷ xs) (y ∷ ys) = f x y ∷ zip-with f xs ys
   return res;
 } #-}
 
+unzip : List (A × B) → List A × List B
+unzip = foldl ([] , []) λ (as , bs) (a , b) → as ++ [ a ] , bs ++ [ b ] 
+
 infix 5 _to_
 
 {-# TERMINATING #-}
