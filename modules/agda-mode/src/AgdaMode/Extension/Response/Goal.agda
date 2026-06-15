@@ -168,8 +168,10 @@ module ExpandState where
     field
       result : String
       state : State
+      first-expansion : Maybe Nat
+      cur-index : Nat
   open t public
-open ExpandState using (es ; result ; state ; State)
+open ExpandState using (es ; result ; state ; first-expansion ; cur-index ; State)
 
 -- Split on:
 -- 1. /(?<=[\s\)\}\"])--/gm, and pick the first part. The rest will be comments anyway.
@@ -189,12 +191,12 @@ parts-regex =
   let regexes = string-regex ∷ comment-start-regex ∷ comment-end-regex ∷ question-mark-regex ∷ [] in
   "(" <> intercalate "|" regexes <> ")"
 
-expand-?s : String → String
+expand-?s : String → Maybe Nat × String
 expand-?s input =
   let non-comment , other = List.uncons (split-regex input single-line-comment-regex) or-else ("" , []) in
   split-regex non-comment parts-regex
-  |> foldl (es "" State.none) (λ expand-state part →
-    let semi-result = record expand-state { result = expand-state .result <> part } in
+  |> foldl (es "" State.none nothing 0) (λ expand-state part →
+    let semi-result = record expand-state { result = expand-state .result <> part ; cur-index = expand-state .cur-index + ∥ part ∥ˢ } in
     if part =~ string-regex ∧ (expand-state .state ExpandState.≠ State.in-comment) ∧ even? ∥ part ∥ˢ then
       record semi-result { state =
         if expand-state .state ExpandState.== State.none then State.in-string else State.none }
@@ -203,10 +205,16 @@ expand-?s input =
     else if part =~ comment-end-regex ∧ (expand-state .state ExpandState.== State.in-comment) then
       record semi-result { state = State.none }
     else if part =~ question-mark-regex ∧ (expand-state .state ExpandState.== State.none) then
-      record expand-state { result = expand-state .result <> "{!  !}" }
+      record expand-state
+        { result = expand-state .result <> "{!  !}"
+        ; first-expansion = expand-state .first-expansion <|> just (expand-state .cur-index)
+        ; cur-index = expand-state .cur-index + 6
+        }
     else semi-result)
-  |> result
-  |> _<> join other
+  |> λ (es result _ expansion _) → expansion , result <> join other
+
+expand-in-ip : Range.t → TextDocument.t → Maybe Nat × String
+expand-in-ip ip-range doc = TextDocument.get-text (InteractionPoint.content-range ip-range) doc |> trim |> expand-?s
 
 handle-give-action : (AgdaInteraction.t → IO ⊤) → Model → (TextDocument.t → GiveAction) → IO Model
 handle-give-action send-command model f = TextEditor.active-editor >>= maybe (pure model) λ e → do
@@ -218,12 +226,17 @@ handle-give-action send-command model f = TextEditor.active-editor >>= maybe (pu
   let content = TextDocument.get-text (InteractionPoint.content-range ip-range) doc
         |> trim
         |> expand-?s
-  
-  let edits = give .give-result |> λ where
-        parens → [ Edit.replace ip-range ("(" ++ content ++ ")") ]
-        no-parens → [ Edit.replace ip-range content ]
-        (str s) → [ Edit.replace ip-range (s |> expand-?s) ]
-  TextEditor.edit edits e
+  let expansion-index , replacement = give .give-result |> λ where
+        parens → let idx , content = expand-in-ip ip-range doc in idx , "(" ++ content ++ ")"
+        no-parens → expand-in-ip ip-range doc
+        (str s) → expand-?s s
+
+  let expansion-position = expansion-index <&> λ idx → Position.right (idx + 3) (Range.start ip-range)
+  expansion-position |> λ where
+    (just pos) → TextEditor.set-selections [ Selection.new pos pos ] e
+    nothing → pure tt
+
+  TextEditor.edit [ Edit.replace ip-range replacement ] e
   TextDocument.save doc
   model <$ send-command (iotcm doc AgdaCommand.load)
 
