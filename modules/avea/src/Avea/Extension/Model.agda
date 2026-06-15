@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Model where
+module Avea.Extension.Model where
 
 open import Agda.Builtin.Unit
 
@@ -20,9 +20,9 @@ open import Effect.Monad
 open Monad {{ ... }}
 open MonadPlus {{ ... }} using (_<|>_ ; ⊘)
 
-open import AgdaMode.Extension.Highlighting
-open import AgdaMode.Extension.Highlighting.Decode hiding (range-decoder)
-open import AgdaMode.Extension.Keymap
+open import Avea.Extension.Highlighting
+open import Avea.Extension.Highlighting.Decode hiding (range-decoder)
+open import Avea.Extension.Keymap
 
 open import Vscode.Panel
 open import Vscode.Window

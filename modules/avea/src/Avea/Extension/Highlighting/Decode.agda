@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Highlighting.Decode where
+module Avea.Extension.Highlighting.Decode where
 
 open import Data.Maybe
 open import Data.Bool

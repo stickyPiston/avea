@@ -1,4 +1,4 @@
-import Main from "./jAgda.AgdaMode.Extension.mjs";
+import Main from "./jAgda.Avea.Extension.mjs";
 import * as vscode from "vscode";
 import * as process from "node:child_process";
 import * as fs from "node:fs/promises";

@@ -11,7 +11,7 @@
   "categories": [
     "Programming Languages"
   ],
-  "repository": "github:stickyPiston/agda-mode-vscode",
+  "repository": "github:stickyPiston/avea",
   "main": "./bundle.js",
   "contributes": {
     "configuration": {
@@ -47,148 +47,148 @@
     ],
     "keybindings": [
       {
-        "command": "agda-mode.load-file",
+        "command": "avea.load-file",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+l"
       },
       {
-        "command": "agda-mode.goal-context",
+        "command": "avea.goal-context",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+e",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.goal-context",
+        "command": "avea.goal-context",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+e",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.goal-context",
+        "command": "avea.goal-context",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+e",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.goal-type",
+        "command": "avea.goal-type",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+t",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.goal-type",
+        "command": "avea.goal-type",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+t",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.goal-type",
+        "command": "avea.goal-type",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+t",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.goal-env",
+        "command": "avea.goal-env",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+,",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.goal-env",
+        "command": "avea.goal-env",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+,",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.goal-env",
+        "command": "avea.goal-env",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+,",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.goal-context-infer",
+        "command": "avea.goal-context-infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+.",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.goal-context-infer",
+        "command": "avea.goal-context-infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+.",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.goal-context-infer",
+        "command": "avea.goal-context-infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+.",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.goal-context-elab",
+        "command": "avea.goal-context-elab",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+;",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.goal-context-elab",
+        "command": "avea.goal-context-elab",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+;",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.goal-context-elab",
+        "command": "avea.goal-context-elab",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+;",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.next-goal",
+        "command": "avea.next-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+f"
       },
       {
-        "command": "agda-mode.prev-goal",
+        "command": "avea.prev-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+b"
       },
       {
-        "command": "agda-mode.show-metas",
+        "command": "avea.show-metas",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+shift+/",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.show-metas",
+        "command": "avea.show-metas",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+shift+/",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.show-metas",
+        "command": "avea.show-metas",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+shift+/",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.show-constraints",
+        "command": "avea.show-constraints",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+=",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.show-constraints",
+        "command": "avea.show-constraints",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+=",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.show-constraints",
+        "command": "avea.show-constraints",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+=",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.refine",
+        "command": "avea.refine",
         "when": "editorLangId =~ /agda/",
         "key": "ctrl+u ctrl+c ctrl+r",
         "args": {
@@ -196,7 +196,7 @@
         }
       },
       {
-        "command": "agda-mode.refine",
+        "command": "avea.refine",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+r",
         "args": {
@@ -204,7 +204,7 @@
         }
       },
       {
-        "command": "agda-mode.give-goal",
+        "command": "avea.give-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+spc",
         "args": {
@@ -212,7 +212,7 @@
         }
       },
       {
-        "command": "agda-mode.give-goal",
+        "command": "avea.give-goal",
         "when": "editorLangId =~ /agda/",
         "key": "ctrl+u ctrl+c ctrl+spc",
         "args": {
@@ -220,152 +220,152 @@
         }
       },
       {
-        "command": "agda-mode.backspace",
+        "command": "avea.backspace",
         "when": "agda-mode.inInputMode",
         "key": "backspace"
       },
       {
-        "command": "agda-mode.arrow-left",
+        "command": "avea.arrow-left",
         "when": "agda-mode.inInputMode",
         "key": "left"
       },
       {
-        "command": "agda-mode.arrow-right",
+        "command": "avea.arrow-right",
         "when": "agda-mode.inInputMode",
         "key": "right"
       },
       {
-        "command": "agda-mode.escape",
+        "command": "avea.escape",
         "when": "agda-mode.inInputMode",
         "key": "escape"
       },
       {
-        "command": "agda-mode.tab",
+        "command": "avea.tab",
         "when": "agda-mode.inInputMode",
         "key": "tab"
       },
       {
-        "command": "agda-mode.auto-goal",
+        "command": "avea.auto-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+a",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.auto-goal",
+        "command": "avea.auto-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+a",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.auto-goal",
+        "command": "avea.auto-goal",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+a",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.compile-file",
+        "command": "avea.compile-file",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+x ctrl+c"
       },
       {
-        "command": "agda-mode.make-case",
+        "command": "avea.make-case",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+c"
       },
       {
-        "command": "agda-mode.restart",
+        "command": "avea.restart",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+x ctrl+r"
       },
       {
-        "command": "agda-mode.infer",
+        "command": "avea.infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+d",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.infer",
+        "command": "avea.infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+d",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.infer",
+        "command": "avea.infer",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+d",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.compute",
+        "command": "avea.compute",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+n",
         "args": { "computeMode": "DefaultCompute" }
       },
       {
-        "command": "agda-mode.compute",
+        "command": "avea.compute",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+n",
         "args": { "computeMode": "IgnoreAbstract" }
       },
       {
-        "command": "agda-mode.compute",
+        "command": "avea.compute",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+n",
         "args": { "computeMode": "UseShowInstance" }
       },
       {
-        "command": "agda-mode.compute",
+        "command": "avea.compute",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+u ctrl+c ctrl+n",
         "args": { "computeMode": "HeadCompute" }
       },
       {
-        "command": "agda-mode.module-contents",
+        "command": "avea.module-contents",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+o",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.module-contents",
+        "command": "avea.module-contents",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+o",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.module-contents",
+        "command": "avea.module-contents",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+o",
         "args": { "rewrite": "Normalised" }
       },
       {
-        "command": "agda-mode.why-in-scope",
+        "command": "avea.why-in-scope",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+w"
       },
       {
-        "command": "agda-mode.toggle-hidden",
+        "command": "avea.toggle-hidden",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+x ctrl+h"
       },
       {
-        "command": "agda-mode.toggle-irrelevant",
+        "command": "avea.toggle-irrelevant",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+x ctrl+i"
       },
       {
-        "command": "agda-mode.search-about",
+        "command": "avea.search-about",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+c ctrl+z",
         "args": { "rewrite": "AsIs" }
       },
       {
-        "command": "agda-mode.search-about",
+        "command": "avea.search-about",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+c ctrl+z",
         "args": { "rewrite": "HeadNormal" }
       },
       {
-        "command": "agda-mode.search-about",
+        "command": "avea.search-about",
         "when": "editorLangId =~ /agda/ && !editor.hasSelection",
         "key": "ctrl+u ctrl+u ctrl+c ctrl+z",
         "args": { "rewrite": "Normalised" }
@@ -373,51 +373,51 @@
     ],
     "commands": [
       {
-        "command": "agda-mode.load-file",
+        "command": "avea.load-file",
         "title": "Load an agda file"
       },
       {
-        "command": "agda-mode.give-goal",
+        "command": "avea.give-goal",
         "title": "Give goal"
       },
       {
-        "command": "agda-mode.goal-context",
+        "command": "avea.goal-context",
         "title": "Goal context"
       },
       {
-        "command": "agda-mode.refine",
+        "command": "avea.refine",
         "title": "Refine goal"
       },
       {
-        "command": "agda-mode.next-goal",
+        "command": "avea.next-goal",
         "title": "Next goal"
       },
       {
-        "command": "agda-mode.prev-goal",
+        "command": "avea.prev-goal",
         "title": "Previous goal"
       },
       {
-        "command": "agda-mode.show-constraints",
+        "command": "avea.show-constraints",
         "title": "Show constraints"
       },
       {
-        "command": "agda-mode.show-metas",
+        "command": "avea.show-metas",
         "title": "Show all goals"
       },
       {
-        "command": "agda-mode.make-case",
+        "command": "avea.make-case",
         "title": "Make case"
       },
       {
-        "command": "agda-mode.auto-goal",
+        "command": "avea.auto-goal",
         "title": "Fill hole by automatic proof search"
       },
       {
-        "command": "agda-mode.compile-file",
+        "command": "avea.compile-file",
         "title": "Compile file"
       },
       {
-        "command": "agda-mode.restart",
+        "command": "avea.restart",
         "title": "Restart the agda process"
       }
     ]
@@ -429,9 +429,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
-    "build:webview": "cd modules/agda-mode && agda --js --js-es6 --js-verify --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/AgdaMode/Webview.agda",
-    "build:extension": "cd modules/agda-mode && agda --js --js-es6 --js-verify --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/AgdaMode/Extension.agda",
-    "build": "npm run build:webview && npm run build:extension && cp modules/agda-mode/src/extension.js out && node esbuild.mjs"
+    "build:webview": "cd modules/avea && agda --js --js-es6 --js-verify --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/Avea/Webview.agda",
+    "build:extension": "cd modules/avea && agda --js --js-es6 --js-verify --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/Avea/Extension.agda",
+    "build": "npm run build:webview && npm run build:extension && cp modules/avea/src/extension.js out && node esbuild.mjs"
   },
   "dependencies": {
     "p-queue": "^9.1.1"

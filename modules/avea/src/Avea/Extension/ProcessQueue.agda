@@ -1,4 +1,4 @@
-module AgdaMode.Extension.ProcessQueue where
+module Avea.Extension.ProcessQueue where
 
 open import Data.Bool
 import Data.List as List
@@ -14,8 +14,8 @@ open import Data.Nat
 open import Data.Map
 open import Data.JSON.Decode
 
-open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Response
+open import Avea.Extension.Model
+open import Avea.Extension.Response
 
 open import Vscode.SemanticTokensProvider
 open import Vscode.Common

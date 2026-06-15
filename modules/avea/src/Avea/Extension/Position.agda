@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Position where
+module Avea.Extension.Position where
 
 open import Data.Nat
 import Data.Nat as Nat
@@ -18,9 +18,9 @@ open import Effect.Monad
 open Monad {{ ... }}
 open import Agda.Builtin.Unit
 
-open import AgdaMode.Extension.ProcessQueue
-open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Highlighting.Decode
+open import Avea.Extension.ProcessQueue
+open import Avea.Extension.Model
+open import Avea.Extension.Highlighting.Decode
 
 open import Class.Show
 

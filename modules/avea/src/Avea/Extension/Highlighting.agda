@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Highlighting where
+module Avea.Extension.Highlighting where
 
 open import Data.Bool
 open import Data.List
@@ -17,8 +17,8 @@ open import Vscode.Common
 open import Vscode.SemanticTokensProvider
 open import Vscode.TextEditor
 
-open import AgdaMode.Extension.Highlighting.Decode
-open import AgdaMode.Extension.Highlighting.Legend
+open import Avea.Extension.Highlighting.Decode
+open import Avea.Extension.Highlighting.Legend
 
 apply-decorations : HighlightDecorationMap.t → TextEditor.t → List Token.t → IO ⊤
 apply-decorations hd-map e tokens = do

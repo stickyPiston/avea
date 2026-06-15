@@ -1,4 +1,4 @@
-module AgdaMode.Webview where
+module Avea.Webview where
 
 open import Iepje.Prelude hiding (Maybe ; nothing ; just)
 

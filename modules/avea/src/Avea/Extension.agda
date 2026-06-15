@@ -1,4 +1,4 @@
-module AgdaMode.Extension where
+module Avea.Extension where
 
 -- TODO: Combine these into some sort of importable prelude with explicit qualifiers
 open import Agda.Builtin.Unit
@@ -25,14 +25,14 @@ open import Data.JSON.Decode
 open import Data.Map
 open import Node.FileSystem
 
-open import AgdaMode.Extension.Highlighting
-open import AgdaMode.Extension.Highlighting.Decode
-open import AgdaMode.Extension.Highlighting.Legend
-open import AgdaMode.Extension.Keymap
-open import AgdaMode.Extension.Response
-open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Position
-open import AgdaMode.Extension.ProcessQueue
+open import Avea.Extension.Highlighting
+open import Avea.Extension.Highlighting.Decode
+open import Avea.Extension.Highlighting.Legend
+open import Avea.Extension.Keymap
+open import Avea.Extension.Response
+open import Avea.Extension.Model
+open import Avea.Extension.Position
+open import Avea.Extension.ProcessQueue
 
 open import Vscode.Common as VSC
 open import Vscode.Command as VSC
@@ -68,8 +68,8 @@ open TraversableM {{ ... }}
 init : Trie.t → IO Model
 init keymap = do
   tokens-request-emitter ← EventEmitter.new
-  sbi₁ ← StatusBarItem.create "agdaMode.statusBar" StatusBarItem.right nothing
-  sbi₂ ← StatusBarItem.create "agdaMode.inputMode" StatusBarItem.left nothing
+  sbi₁ ← StatusBarItem.create "avea.statusBar" StatusBarItem.right nothing
+  sbi₂ ← StatusBarItem.create "avea.inputMode" StatusBarItem.left nothing
   let open DecorationType
   dec₁ ← Options.new >>= create ∘ Options.set-text-decoration "underline"
   dec₂ ← Options.new >>= create ∘ Options.set-theme-background-colour "editor.selectionHighlightBackground"
@@ -90,22 +90,22 @@ init keymap = do
 
 goal-context-cmds : StringMap.t (Rewrite.t → InteractionPoint.t → AgdaCommand.t)
 goal-context-cmds = StringMap.empty
-  |> StringMap.insert "agda-mode.goal-context" AgdaCommand.context
-  |> StringMap.insert "agda-mode.goal-type" AgdaCommand.goal-type
-  |> StringMap.insert "agda-mode.goal-env" AgdaCommand.goal-type-context
-  |> StringMap.insert "agda-mode.goal-context-infer" AgdaCommand.goal-type-context-infer
-  |> StringMap.insert "agda-mode.goal-context-elab" AgdaCommand.goal-type-context-check
-  |> StringMap.insert "agda-mode.auto-goal" AgdaCommand.auto-goal
+  |> StringMap.insert "avea.goal-context" AgdaCommand.context
+  |> StringMap.insert "avea.goal-type" AgdaCommand.goal-type
+  |> StringMap.insert "avea.goal-env" AgdaCommand.goal-type-context
+  |> StringMap.insert "avea.goal-context-infer" AgdaCommand.goal-type-context-infer
+  |> StringMap.insert "avea.goal-context-elab" AgdaCommand.goal-type-context-check
+  |> StringMap.insert "avea.auto-goal" AgdaCommand.auto-goal
 
 goal-give-cmds : StringMap.t (Bool → InteractionPoint.t → AgdaCommand.t)
 goal-give-cmds = StringMap.empty
-  |> StringMap.insert "agda-mode.refine" AgdaCommand.refine-or-intro
-  |> StringMap.insert "agda-mode.give-goal" AgdaCommand.give
+  |> StringMap.insert "avea.refine" AgdaCommand.refine-or-intro
+  |> StringMap.insert "avea-mode.give-goal" AgdaCommand.give
 
 show-general-info-cmds : StringMap.t (Rewrite.t → AgdaCommand.t)
 show-general-info-cmds = StringMap.empty
-  |> StringMap.insert "agda-mode.show-constraints" AgdaCommand.show-constraints
-  |> StringMap.insert "agda-mode.show-metas" AgdaCommand.show-metas
+  |> StringMap.insert "avea.show-constraints" AgdaCommand.show-constraints
+  |> StringMap.insert "avea.show-metas" AgdaCommand.show-metas
 
 backends : StringMap.t Backend.t
 backends = (ghc true ∷ ghc false ∷ js ∷ html ∷ latex ∷ quicklatex ∷ [])
@@ -113,8 +113,8 @@ backends = (ghc true ∷ ghc false ∷ js ∷ html ∷ latex ∷ quicklatex ∷ 
 
 toggle-cmds : StringMap.t AgdaCommand.t
 toggle-cmds = StringMap.empty
-  |> StringMap.insert "agda-mode.toggle-hidden" AgdaCommand.toggle-hidden
-  |> StringMap.insert "agda-mode.toggle-irrelevant" AgdaCommand.toggle-irrelevant
+  |> StringMap.insert "avea.toggle-hidden" AgdaCommand.toggle-hidden
+  |> StringMap.insert "avea.toggle-irrelevant" AgdaCommand.toggle-irrelevant
 
 -- TODO: Turn this into decoders?
 postulate GiveArgsObject : Set
@@ -180,7 +180,7 @@ on-interaction-point? ips change = ips
 
 activate : IO ⊤
 activate = try λ _ → do
-  output-chan ← OutputChannel.create "Agda Mode"
+  output-chan ← OutputChannel.create "Avea"
 
   extension-context ← ExtensionContext.get
   let keymap-path = Path.join (ExtensionContext.extension-path extension-context ∷ "keymap.json" ∷ [])
@@ -193,11 +193,11 @@ activate = try λ _ → do
   model-ref ← init init-keymap >>= IO.Ref.new 
   agda , disposable ← AgdaProcess.spawn output-chan model-ref
 
-  register-command "agda-mode.restart" $ AgdaProcess.restart output-chan model-ref agda
+  register-command "avea.restart" $ AgdaProcess.restart output-chan model-ref agda
 
   -- TODO: Register command handlers
   -- TODO: Register disposables
-  register-command "agda-mode.load-file" $ do
+  register-command "avea.load-file" $ do
     just intr ← AgdaInteraction.from-AgdaCommand AgdaCommand.load where _ → pure tt
     TextDocument.save (intr .file)
     AgdaProcess.send-command output-chan intr agda
@@ -215,16 +215,16 @@ activate = try λ _ → do
       just intr ← AgdaInteraction.under-cursor-command model (cmd (get-pmLambda o)) where _ → pure tt
       AgdaProcess.send-command output-chan intr agda
 
-  register-command "agda-mode.make-case" $ do
+  register-command "avea.make-case" $ do
     model ← IO.Ref.get model-ref
     just intr ← AgdaInteraction.under-cursor-command model AgdaCommand.make-case where _ → pure tt
     AgdaProcess.send-command output-chan intr agda
 
-  register-command "agda-mode.next-goal" $ do
+  register-command "avea.next-goal" $ do
     model ← IO.Ref.get model-ref
     tt <$ jump-to-goal model λ o ips → find ((_> o) ∘ InteractionPoint.cursor-position) ips <|> (ips !! 0)
 
-  register-command "agda-mode.prev-goal" $ do
+  register-command "avea.prev-goal" $ do
     model ← IO.Ref.get model-ref
     tt <$ jump-to-goal model λ o ips → find ((_< o) ∘ InteractionPoint.cursor-position) (reverse ips) <|> (reverse ips !! 0)
 
@@ -234,12 +234,12 @@ activate = try λ _ → do
       just intr ← AgdaInteraction.from-AgdaCommand (cmd r) where _ → pure tt
       AgdaProcess.send-command output-chan intr agda
 
-  register-command "agda-mode.compile-file" $ do
+  register-command "avea.compile-file" $ do
     just backend ← backends !?_ <$> Window.quick-pick (StringMap.keys backends) where _ → pure tt
     just intr ← AgdaInteraction.from-AgdaCommand (AgdaCommand.compile-file backend) where _ → pure tt
     AgdaProcess.send-command output-chan intr agda
 
-  register-command-with-args "agda-mode.compute" λ o → do
+  register-command-with-args "avea.compute" λ o → do
     model ← IO.Ref.get model-ref
     just mode ← pure $ ComputeMode.decoder =<< (just (j-string $ get-compute-mode-string o)) where _ → pure tt
     just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.compute-goal mode) >>= λ where
@@ -247,7 +247,7 @@ activate = try λ _ → do
       nothing → AgdaInteraction.input-prompt-command (AgdaCommand.compute-toplevel mode)) where _ → pure tt
     AgdaProcess.send-command output-chan intr agda
 
-  register-command-with-args "agda-mode.module-contents" λ o → do
+  register-command-with-args "avea.module-contents" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
     just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.module-contents-goal r) >>= λ where
@@ -255,7 +255,7 @@ activate = try λ _ → do
       nothing → AgdaInteraction.input-prompt-command (AgdaCommand.module-contents-toplevel r)) where _ → pure tt
     AgdaProcess.send-command output-chan intr agda
 
-  register-command "agda-mode.why-in-scope" $ do
+  register-command "avea.why-in-scope" $ do
     model ← IO.Ref.get model-ref
     just intr ← (AgdaInteraction.under-cursor-command model AgdaCommand.why-in-scope-goal >>= λ where
       (just intr) → pure (just intr)
@@ -267,13 +267,13 @@ activate = try λ _ → do
       just intr ← AgdaInteraction.from-AgdaCommand cmd where _ → pure tt
       AgdaProcess.send-command output-chan intr agda
 
-  register-command-with-args "agda-mode.search-about" λ o → do
+  register-command-with-args "avea.search-about" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
     just intr ← AgdaInteraction.input-prompt-command (AgdaCommand.search-about-toplevel r) where _ → pure tt
     AgdaProcess.send-command output-chan intr agda
 
-  register-command-with-args "agda-mode.infer" λ o → do
+  register-command-with-args "avea.infer" λ o → do
     model ← IO.Ref.get model-ref
     just r ← pure $ Rewrite.decoder =<< (just (j-string $ get-rewrite-string o)) where _ → pure tt
     just intr ← (AgdaInteraction.under-cursor-command model (AgdaCommand.infer r) >>= λ where
@@ -322,11 +322,11 @@ activate = try λ _ → do
 
   input-mode-model ← IO.Ref.new $ InputMode.Model ∋ nothing
   let uim x = do IO.Ref.get model-ref >>= λ model → update-input-mode (model .keymap) (model .underline-decoration) (model .input-mode-status-item) input-mode-model x
-  register-command "agda-mode.backspace" $ uim InputMode.backspace
-  register-command "agda-mode.arrow-left" $ uim InputMode.left
-  register-command "agda-mode.arrow-right" $ uim InputMode.right
-  register-command "agda-mode.escape" $ uim InputMode.escape
-  register-command "agda-mode.tab" $ uim InputMode.tab
+  register-command "avea.backspace" $ uim InputMode.backspace
+  register-command "avea.arrow-left" $ uim InputMode.left
+  register-command "avea.arrow-right" $ uim InputMode.right
+  register-command "avea.escape" $ uim InputMode.escape
+  register-command "avea.tab" $ uim InputMode.tab
   register-command-with-args "type" λ args →
     required "text" (InputMode.character <$> string) args |> maybe (pure tt) uim
 

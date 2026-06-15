@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Highlighting.Legend where
+module Avea.Extension.Highlighting.Legend where
 
 open import Data.Maybe
 open import Data.Bool
@@ -11,7 +11,7 @@ open Monad {{ ... }}
 
 open import Vscode.TextEditor
 
-open import AgdaMode.Extension.Highlighting.Decode
+open import Avea.Extension.Highlighting.Decode
 
 module TokenType where
   data t : Set where

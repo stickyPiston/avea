@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Response where
+module Avea.Extension.Response where
 
 open import Data.String
 open import Data.Nat hiding (_==_) ; import Data.Nat as Nat
@@ -22,11 +22,11 @@ open import Class.Show
 open import Function hiding (id)
 open import Level
 
-open import AgdaMode.Extension.Highlighting
-open import AgdaMode.Extension.Highlighting.Decode
-open import AgdaMode.Extension.Model
-open import AgdaMode.Extension.Response.Display
-open import AgdaMode.Extension.Response.Goal
+open import Avea.Extension.Highlighting
+open import Avea.Extension.Highlighting.Decode
+open import Avea.Extension.Model
+open import Avea.Extension.Response.Display
+open import Avea.Extension.Response.Goal
 
 open import Vscode.Window
 open import Vscode.Panel

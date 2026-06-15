@@ -1,4 +1,4 @@
-module AgdaMode.Extension.Keymap where
+module Avea.Extension.Keymap where
 
 open import Data.List renaming (∥_∥ to ∥_∥ˡ ; slice to sliceˡ)
 import Data.List.Zipper as List
