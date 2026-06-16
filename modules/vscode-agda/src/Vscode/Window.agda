@@ -76,7 +76,14 @@ module QuickPickItem where
       label : String
   open t public
 
-  {-# COMPILE JS t = ((x, v) => v["record"](x.alwaysShow, x.picked, x.description, x.detail, x.kind, x.label)) #-}
+  {-# COMPILE JS t = ((x, v) => v["make-QuickPickItem"](
+    x.alwaysShow ?? false,
+    x.picked ?? false,
+    x.description === undefined ? (a => a["nothing"]()) : (a => a["just"](x.description)),
+    x.detail === undefined ? (a => a["nothing"]()) : (a => a["just"](x.detail)),
+    x.kind,
+    x.label
+  )) #-}
   {-# COMPILE JS make-QuickPickItem = alwaysShow => picked => description => detail => kind => label => {
     return {
       kind, label, alwaysShow, picked,

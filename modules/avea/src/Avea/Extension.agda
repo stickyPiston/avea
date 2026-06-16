@@ -64,7 +64,7 @@ open IO.Effectful
 
 open import Effect.Monad
 open Monad {{ ... }}
-open MonadPlus {{ ... }} using (⊘ ; _<|>_)
+open MonadPlus {{ ... }} using (⊘ ; _<|>_ ; alt)
 open TraversableM {{ ... }} 
 
 init : Trie.t → IO Model
@@ -186,6 +186,14 @@ postulate lookpath : String → IO (Maybe String)
   return result ? (a => a["just"](result)) : (a => a["nothing"]());
 } #-}
 
+get-agda-version-of : String → IO (Either String QuickPickItem.t)
+get-agda-version-of path =
+  Process.exec (path <> " --version") <&> λ where
+    (right stdout) → head (split stdout "\n") |> λ where
+      (just version) → right record (QuickPickItem.empty QuickPickItem.default version) { detail = just path }
+      nothing → left ("Unexpected output from configured agda version: " <> path)
+    (left err) → left ("Unknown or invalid command configured as agda version: " <> path)
+
 activate : IO ⊤
 activate = try λ _ → do
   output-chan ← OutputChannel.create "Avea"
@@ -293,19 +301,22 @@ activate = try λ _ → do
     config ← Workspace.get-configuration "avea"
     WorkspaceConfiguration.get "agda-versions" config
       |> (from-Maybe [] ∘ list string)
-      |> mapM (λ version-path →
-        Process.exec (version-path <> " --version") <&> λ where
-          (right stdout) → head (split stdout "\n") |> λ where
-            (just version) → right record (QuickPickItem.empty QuickPickItem.default version) { detail = just version-path }
-            nothing → left ("Unexpected output from configured agda version: " <> version-path)
-          (left err) → left ("Unknown or invalid command configured as agda version: " <> version-path))
-      |> bind {!  !} -- TODO: Find version on PATH and add it to the list if it wasn't already in there
+      |> mapM get-agda-version-of
+      |> bind (λ possible-items → lookpath "agda" >>= λ where
+        (just agda-path) → do
+          item ← get-agda-version-of agda-path <&> fmap λ item → record item { label = QuickPickItem.label item <> " (from PATH)" }
+          possible-items
+            |> filter (λ { (right record { detail = just detail }) → not (detail String.== agda-path) ; _ → true })
+            |> snoc item
+            |> pure
+        nothing → pure possible-items)
       |> fmap collect-either
       |> bind λ where
-        (right items) → do
-          path ← from-Maybe "" ∘ bind QuickPickItem.detail <$> Window.quick-pick-with-items items
-          WorkspaceConfiguration.update "agda-path" (just path) config
-          AgdaProcess.restart output-chan model-ref agda
+        (right items) → bind QuickPickItem.detail <$> Window.quick-pick-with-items items >>= λ where
+          (just path) → do
+            WorkspaceConfiguration.update "agda-path" (just path) config
+            AgdaProcess.restart output-chan model-ref agda
+          nothing → pure tt
         (left err) → do
           OutputChannel.error err output-chan
           Window.show-error-message err [ "Configure versions" ] >>= λ where

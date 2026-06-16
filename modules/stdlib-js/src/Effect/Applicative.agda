@@ -36,3 +36,6 @@ record Alternative (F : Set ℓ₁ → Set ℓ₂) : Set (lsuc (ℓ₁ ⊔ ℓ�
     applicative : Applicative F
     ⊘ : F A
     _<|>_ : F A → F A → F A
+
+  alt : F A → F A → F A
+  alt = flip _<|>_
