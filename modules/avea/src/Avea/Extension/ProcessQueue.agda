@@ -13,6 +13,7 @@ open import Data.JSON
 open import Data.Nat
 open import Data.Map
 open import Data.JSON.Decode
+open import Data.Either
 
 open import Avea.Extension.Model
 open import Avea.Extension.Response
@@ -117,6 +118,12 @@ module AgdaProcess where
       config ← Config.load
       let args = "--interaction-json" ∷ filter (λ s → ∥ s ∥ > 0) (split (config .extra-args) " ")
       let cmd-name = config .agda-path or-else "agda"
+
+      -- Trace the Agda version to the output window, spawn a separate command since the handlers aren't set up yet.
+      Process.exec (cmd-name ++ " --version") >>= λ where
+        (right stdout) → OutputChannel.trace ("Using " ++ List.head (split stdout "\n") or-else "") output-chan
+        (left err) → pure tt
+
       OutputChannel.trace ("Spawning process: " ++ cmd-name ++ " " ++ intercalate " " args) output-chan
       Process.spawn cmd-name args
 
@@ -157,7 +164,7 @@ module AgdaProcess where
             proc ← spawn-proc output-chan
             Ref.set proc-ref proc
             setup-handlers proc-ref res-queue model-ref output-chan
-          (just "Open settings") → execute-command "workbench.action.openSettings" "agda-mode.agda-path"
+          (just "Open settings") → execute-command "workbench.action.openSettings" "avea.agda-path"
           _ → pure tt
 
       setup-handlers : Ref.t Process.t → JobQueue.t → Ref.t Model → OutputChannel.t → IO ⊤

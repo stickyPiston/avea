@@ -4,6 +4,7 @@ open import Data.String
 open import Data.List
 open import Data.IO
 open import Data.Bool
+open import Data.Either
 open import Agda.Builtin.Unit
 
 module Buffer where
@@ -20,6 +21,14 @@ module Process where
 
     postulate spawn : String → List String → IO t
     {-# COMPILE JS spawn = cmd => args => async () => AgdaModeImports.process.spawn(cmd, args) #-}
+
+    postulate exec : String → IO (Either String String)
+    {-# COMPILE JS exec = cmd => () => new Promise((resolve, reject) => {
+      AgdaModeImports.process.exec(cmd, (err, stdout, stderr) => {
+        if (err) resolve(a => a["left"](err));
+        resolve(a => a["right"](stdout));
+      })
+    }) #-}
 
     postulate write : String → t → IO ⊤
     {-# COMPILE JS write = chunk => proc => async () => {

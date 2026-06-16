@@ -60,6 +60,47 @@ module TextDocumentShowOptions where
     view-column : ViewColumn.t
   open t public
 
+module QuickPickItem where
+  data Kind : Set where
+    separator default : Kind
+  {-# COMPILE JS Kind = ((x, v) => x === -1 ? v["separator"]() : v["default"]()) #-}
+  {-# COMPILE JS separator = -1 #-}
+  {-# COMPILE JS default = 0 #-}
+
+  record t : Set where
+    constructor make-QuickPickItem
+    field
+      always-show? picked? : Bool
+      description detail : Maybe String
+      kind : Kind
+      label : String
+  open t public
+
+  {-# COMPILE JS t = ((x, v) => v["record"](x.alwaysShow, x.picked, x.description, x.detail, x.kind, x.label)) #-}
+  {-# COMPILE JS make-QuickPickItem = alwaysShow => picked => description => detail => kind => label => {
+    return {
+      kind, label, alwaysShow, picked,
+      description: description({ "just": x => x, "nothing": () => undefined }),
+      detail: detail({ "just": x => x, "nothing": () => undefined })
+    };
+  } #-}
+  {-# COMPILE JS t.always-show? = ({ alwaysShow }) => alwaysShow ?? false #-}
+  {-# COMPILE JS t.picked? = ({ picked }) => picked ?? false #-}
+  {-# COMPILE JS t.description = ({ description }) => description === undefined
+    ? (a => a["nothing"]()) : (a => a["just"](description)) #-}
+  {-# COMPILE JS t.detail = ({ detail }) => detail === undefined
+    ? (a => a["nothing"]()) : (a => a["just"](detail)) #-}
+  {-# COMPILE JS t.kind = ({ kind }) => kind ?? 0 #-}
+  {-# COMPILE JS t.label = ({ label }) => label #-}
+
+  empty : Kind → String → t
+  empty k l = record
+    { kind = k ; label = l ; always-show? = false
+    ; picked? = false ; description = nothing ; detail = nothing
+    }
+
+open QuickPickItem using (always-show? ; picked? ; description ; detail ; kind ; label ; Kind)
+
 module Window where
   open import Vscode.Panel
   open TextDocumentShowOptions
@@ -90,6 +131,12 @@ module Window where
   postulate quick-pick : List String → IO String
   {-# COMPILE JS quick-pick = options => async () => {
     return await AgdaModeImports.vscode.window.showQuickPick(options);
+  } #-}
+
+  postulate quick-pick-with-items : List QuickPickItem.t → IO (Maybe QuickPickItem.t)
+  {-# COMPILE JS quick-pick-with-items = options => async () => {
+    const result = await AgdaModeImports.vscode.window.showQuickPick(options);
+    return result ? (a => a["just"](result)) : (a => a["nothing"]());
   } #-}
 
   postulate show-information-message show-error-message : String → List String → IO (Maybe String)

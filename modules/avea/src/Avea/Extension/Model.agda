@@ -303,19 +303,20 @@ module Config where
     field
       agda-path : Maybe String
       extra-args : String
+      versions : List String
   open t public
 
   decoder : Decoder t
   decoder = do
     path ← required "agda-path" string <&> λ s → if s String.== "" then nothing else just s
-    mkConfig path <$> required "extra-args" string
+    (| (mkConfig path) (required "extra-args" string) (required "agda-versions" (list string)) |)
 
   postulate invalid : {A : Set} → IO A
   {-# COMPILE JS invalid = A => async () => { throw "call to invalid" } #-}
 
   load : IO t
   load = do
-    just config ← decoder <$> Workspace.get-configuration "agda-mode"
+    just config ← decoder ∘ WorkspaceConfiguration.as-JSON <$> Workspace.get-configuration "avea"
       where _ → invalid -- TODO: Show an error to the user
     pure config
 open Config using (agda-path ; extra-args) public

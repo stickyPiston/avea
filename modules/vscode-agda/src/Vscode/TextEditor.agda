@@ -148,6 +148,21 @@ module TextDocumentChangeEvent where
   {-# COMPILE JS t.reason = ({ reason }) => reason ? (a => a["just"](reason)) : (a => a["nothing"]()) #-}
 open TextDocumentChangeEvent using (content-changes ; document ; reason ; mkTextDocumentChangeEvent) public
 
+module WorkspaceConfiguration where
+  postulate t : Set
+
+  postulate get : String → t → JSON
+  {-# COMPILE JS get = section => conf => conf.get(section) #-}
+
+  postulate update : String → Maybe String → t → IO ⊤
+  {-# COMPILE JS update = section => value => conf => async () => {
+    await conf.update(section, value({ "just": x => x, "nothing": () => undefined }), true);
+    return a => a["tt"]();
+  } #-}
+
+  postulate as-JSON : t → JSON
+  {-# COMPILE JS as-JSON = x => x #-}
+
 module Workspace where
   -- TODO: Handle disposable
   postulate on-did-change-text-document : (TextDocumentChangeEvent.t → IO ⊤) → IO ⊤
@@ -156,7 +171,7 @@ module Workspace where
     return a => a["tt"]();
   } #-}
 
-  postulate get-configuration : String → IO JSON
+  postulate get-configuration : String → IO WorkspaceConfiguration.t
   {-# COMPILE JS get-configuration = name => async () => {
     return AgdaModeImports.vscode.workspace.getConfiguration(name);
   } #-}
