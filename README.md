@@ -52,6 +52,7 @@ All of these commands operate on a goal, however some commands also work outside
 |Toggle irrelevant arguments|<kbd>ctrl+c ctrl+x ctrl+i</kbd>|❌|
 |Restart Agda process|<kbd>ctrl+c ctrl+x ctrl+r</kbd>|❌|
 |Compile file|<kbd>ctrl+c ctrl+x ctrl+c</kbd>|❌|
+|Switch version|<kbd>ctrl+c ctrl+x ctrl+s</kbd>|❌|
 
 ## Unicode input
 
