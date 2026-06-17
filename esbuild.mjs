@@ -8,5 +8,5 @@ await esbuild.build({
   external: ["vscode"],
   format: "cjs",
   bundle: true,
-  minify: env["DEV"] !== "TRUE"
+  minify: true
 })
